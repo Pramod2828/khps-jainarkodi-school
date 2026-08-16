@@ -7,7 +7,7 @@ import Footer from '@/components/Footer';
 import AnnouncementTicker from '@/components/AnnouncementTicker';
 import LoadingState from '@/components/LoadingState';
 import { api, getAssetUrl } from '@/services/api';
-import { Homework, Notice, Activity, CalendarEvent, SchoolInfo, ClassItem, Announcement } from '@/types';
+import { Homework, Notice, Activity, CalendarEvent, SchoolInfo, ClassItem, Announcement, GalleryItem } from '@/types';
 import {
   BookOpen,
   Bell,
@@ -41,6 +41,7 @@ export default function HomePage() {
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [galleryPhotos, setGalleryPhotos] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [hwLoading, setHwLoading] = useState(false);
 
@@ -50,14 +51,15 @@ export default function HomePage() {
   useEffect(() => {
     async function loadHomeData() {
       try {
-        const [infoRes, cRes, noticeRes, actRes, calRes, annRes, hwRes] = await Promise.all([
+        const [infoRes, cRes, noticeRes, actRes, calRes, annRes, hwRes, galRes] = await Promise.all([
           api.get('/school'),
           api.get('/classes'),
           api.get('/notices?limit=4'),
           api.get('/activities?limit=3'),
           api.get('/calendar?upcoming=true&limit=4'),
           api.get('/announcements'),
-          api.get('/homework?limit=6&class_id=all')
+          api.get('/homework?limit=6&class_id=all'),
+          api.get('/gallery?limit=6')
         ]);
 
         if (infoRes.data.success) setSchoolInfo(infoRes.data.data);
@@ -66,6 +68,7 @@ export default function HomePage() {
         if (actRes.data.success) setRecentActivities(actRes.data.data || []);
         if (annRes.data.success) setAnnouncements(annRes.data.data || []);
         if (hwRes.data.success) setLatestHomework(hwRes.data.data || []);
+        if (galRes && galRes.data && galRes.data.success) setGalleryPhotos(galRes.data.data || []);
         if (calRes.data.success) {
           const todayStr = new Date().toISOString().split('T')[0];
           const activeUpcoming = (calRes.data.data || []).filter(
@@ -378,8 +381,8 @@ export default function HomePage() {
           )}
         </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <section className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          <section className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-6">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
@@ -400,7 +403,7 @@ export default function HomePage() {
             ) : latestNotices.length === 0 ? (
               <p className="text-xs text-slate-500 py-4 text-center">No active notices available.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 flex-1">
                 {latestNotices.map((n) => {
                   const isUrgent = n.priority === 'URGENT';
                   const isImportant = n.priority === 'IMPORTANT';
@@ -440,7 +443,7 @@ export default function HomePage() {
             )}
           </section>
 
-          <section className="lg:col-span-5 bg-gradient-to-br from-slate-900 to-emerald-950 text-white p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-lg space-y-6">
+          <section className="lg:col-span-5 bg-gradient-to-br from-slate-900 to-emerald-950 text-white p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-lg flex flex-col justify-between space-y-6">
             <div className="flex justify-between items-center border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
@@ -459,25 +462,29 @@ export default function HomePage() {
             {loading ? (
               <LoadingState message="Loading events..." />
             ) : upcomingEvents.length === 0 ? (
-              <p className="text-xs text-slate-400 py-4 text-center">No upcoming events scheduled.</p>
+              <div className="flex-1 flex items-center justify-center py-8 text-center">
+                <p className="text-xs text-slate-400">No upcoming events scheduled.</p>
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 flex-1">
                 {upcomingEvents.map((ev) => (
-                  <div key={ev.id} className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/60 flex items-start gap-3">
-                    <div className="bg-emerald-600 text-white text-center p-2 rounded-xl shrink-0 min-w-[50px]">
-                      <div className="text-xs font-extrabold uppercase">
+                  <div key={ev.id} className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/60 flex items-center gap-3.5 hover:border-emerald-500/50 transition">
+                    <div className="bg-gradient-to-b from-emerald-500 to-teal-600 text-white text-center p-2 rounded-xl shrink-0 min-w-[54px] shadow-sm">
+                      <div className="text-[10px] font-extrabold uppercase tracking-wider">
                         {new Date(ev.start_date).toLocaleString('default', { month: 'short' })}
                       </div>
-                      <div className="text-lg font-black leading-none">
+                      <div className="text-xl font-black leading-none mt-0.5">
                         {new Date(ev.start_date).getDate()}
                       </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">
                         {ev.event_type}
                       </span>
-                      <h4 className="text-xs font-bold text-white leading-tight">{ev.title}</h4>
-                      <p className="text-[11px] text-slate-300 mt-1 line-clamp-1">{ev.description}</p>
+                      <h4 className="text-xs sm:text-sm font-bold text-white leading-snug truncate">{ev.title}</h4>
+                      {ev.description && (
+                        <p className="text-[11px] text-slate-300 line-clamp-1 leading-relaxed">{ev.description}</p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -535,6 +542,51 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Photo Gallery Showcase Section */}
+        <section className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 border-b border-slate-200 pb-4">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Campus & Events</span>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Photo Gallery</h2>
+            </div>
+            <Link href="/gallery" className="text-xs font-bold text-emerald-700 hover:underline inline-flex items-center gap-1">
+              View Full Gallery <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {loading ? (
+            <LoadingState message="Loading gallery photos..." />
+          ) : galleryPhotos.length === 0 ? (
+            <div className="bg-white p-8 rounded-2xl text-center border border-slate-200/80 text-slate-500 text-xs space-y-1">
+              <ImageIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="font-bold text-slate-700">No Gallery Photos Added Yet</p>
+              <p className="text-slate-400">Photos uploaded from the Admin/Teacher portal will appear here.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {galleryPhotos.slice(0, 6).map((photo) => (
+                <Link
+                  key={photo.id}
+                  href="/gallery"
+                  className="group relative aspect-square rounded-2xl overflow-hidden border border-slate-200/80 bg-slate-100 shadow-xs hover:shadow-md transition"
+                >
+                  <img
+                    src={getAssetUrl(photo.image_url)}
+                    alt={photo.title || 'Gallery Photo'}
+                    className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-3 text-white">
+                    <p className="text-xs font-bold truncate">{photo.title}</p>
+                    {photo.category_name && (
+                      <span className="text-[9px] font-semibold text-emerald-300 uppercase tracking-wider">{photo.category_name}</span>
+                    )}
+                  </div>
+                </Link>
               ))}
             </div>
           )}

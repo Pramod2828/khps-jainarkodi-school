@@ -7,7 +7,7 @@ let dbPromise = null;
 
 async function getSqliteDb() {
   if (!dbPromise) {
-    const dbPath = path.join(__dirname, '../../school_jainarkodi.sqlite');
+    const dbPath = process.env.DB_PATH || (process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'school_jainarkodi.sqlite') : path.join(__dirname, '../../school_jainarkodi.sqlite'));
     dbPromise = open({
       filename: dbPath,
       driver: sqlite3.Database

@@ -33,8 +33,21 @@ app.use(helmet({
   crossOriginResourcePolicy: false // Allow static files like images to be served to Next.js / Mobile APKs
 }));
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:5000'
+].filter(Boolean);
+
 app.use(cors({
-  origin: true, // Allow frontend & mobile clients
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Android APK WebViews, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    return callback(null, true); // Allow production Vercel frontend & APK clients
+  },
   credentials: true
 }));
 

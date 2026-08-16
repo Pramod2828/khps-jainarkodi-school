@@ -62,9 +62,9 @@ export default function CalendarPublicPage() {
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-6 sm:space-y-8">
-        <div className="bg-white p-2.5 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 overflow-x-auto scrollbar-none">
-          <div className="flex items-center gap-2 min-w-max">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-6 sm:space-y-8 w-full overflow-x-hidden">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 w-full overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 min-w-max pb-0.5">
             <span className="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1 shrink-0">
               <Filter className="w-3.5 h-3.5" /> Event Type:
             </span>
@@ -87,16 +87,18 @@ export default function CalendarPublicPage() {
         {loading ? (
           <LoadingState message="Loading calendar schedule..." />
         ) : events.length === 0 ? (
-          <EmptyState
-            title="No Events Found"
-            message="No calendar events found under this filter."
-          />
+          <div className="py-4 sm:py-8">
+            <EmptyState
+              title="No Events Found"
+              message="No calendar events found under this filter."
+            />
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full">
             {events.map((ev) => (
               <div
                 key={ev.id}
-                className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-start gap-3 sm:gap-4"
+                className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-start gap-3 sm:gap-4 w-full"
               >
                 <div className="bg-gradient-to-b from-emerald-600 to-teal-700 text-white text-center p-2.5 sm:p-3 rounded-2xl shrink-0 min-w-[56px] sm:min-w-[65px] shadow-xs">
                   <div className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider">
@@ -111,10 +113,10 @@ export default function CalendarPublicPage() {
                 </div>
 
                 <div className="space-y-1.5 flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center justify-between gap-1 flex-wrap">
                     {getEventBadge(ev.event_type)}
                   </div>
-                  <h3 className="text-xs sm:text-base font-bold text-slate-900 leading-snug break-words">{ev.title}</h3>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug break-words">{ev.title}</h3>
                   {ev.description && (
                     <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed break-words">{ev.description}</p>
                   )}

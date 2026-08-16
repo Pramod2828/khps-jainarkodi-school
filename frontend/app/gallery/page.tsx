@@ -61,9 +61,9 @@ export default function GalleryPublicPage() {
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-6 sm:space-y-8">
-        <div className="bg-white p-2.5 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 overflow-x-auto scrollbar-none">
-          <div className="flex items-center gap-2 min-w-max">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-6 sm:space-y-8 w-full overflow-x-hidden">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 w-full overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 min-w-max pb-0.5">
             <button
               onClick={() => setSelectedCategory('all')}
               className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition shrink-0 ${
@@ -93,12 +93,16 @@ export default function GalleryPublicPage() {
         {loading ? (
           <LoadingState message="Loading photo gallery..." />
         ) : galleryPhotos.length === 0 ? (
-          <EmptyState
-            title="No Photos Available"
-            message="No photos found under this category yet."
-          />
+          <div className="py-4 sm:py-8 flex justify-center">
+            <div className="w-full max-w-lg">
+              <EmptyState
+                title="No Photos Available"
+                message="No photos found under this category yet."
+              />
+            </div>
+          </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 w-full">
             {galleryPhotos.map((photo) => (
               <div
                 key={photo.id}

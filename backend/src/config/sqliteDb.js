@@ -376,9 +376,11 @@ async function initSqliteSchema(db) {
   const sCount = await db.get('SELECT COUNT(*) as cnt FROM school_information');
   if (sCount.cnt === 0) {
     await db.exec(`
-      INSERT INTO school_information (id, school_name, tagline, address, phone, email, head_teacher, description, timings, map_url) VALUES
-      (1, 'Government Primary School Jainarkodi', 'Learning today, building a better tomorrow.', 'Jainarkodi Village, Primary School Circle, Karnataka 574227', '+91 94812 34567', 'contact@jainarkodi.edu.in', 'Mrs. Savitha R. Shetty', 'Government Primary School Jainarkodi is dedicated to providing holistic primary education, fostering critical thinking, moral values, and academic excellence for children from 1st to 5th Standard in a warm, nurturing community environment.', 'Monday – Friday: 9:00 AM – 4:00 PM | Saturday: 9:00 AM – 1:00 PM', 'https://maps.google.com/?q=Jainarkodi');
+      INSERT INTO school_information (id, school_name, tagline, logo_url, address, phone, email, head_teacher, description, timings, map_url) VALUES
+      (1, 'Government Primary School Jainarkodi', 'Learning today, building a better tomorrow.', '/logo.png', 'Jainarkodi Village, Primary School Circle, Karnataka 574227', '+91 94812 34567', 'contact@jainarkodi.edu.in', 'Mrs. Savitha R. Shetty', 'Government Primary School Jainarkodi is dedicated to providing holistic primary education, fostering critical thinking, moral values, and academic excellence for children from 1st to 5th Standard in a warm, nurturing community environment.', 'Monday – Friday: 9:00 AM – 4:00 PM | Saturday: 9:00 AM – 1:00 PM', 'https://maps.google.com/?q=Jainarkodi');
     `);
+  } else {
+    try { await db.run("UPDATE school_information SET logo_url = '/logo.png' WHERE id = 1;"); } catch (e) {}
   }
 
   // 16. Calendar Events

@@ -30,8 +30,8 @@ export default function Navbar() {
           
           {/* Logo & School Name */}
           <Link href="/" className="flex items-center gap-2 group shrink-0 min-w-0">
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-200 group-hover:scale-105 transition shrink-0">
-              <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-white p-0.5 border border-emerald-100 flex items-center justify-center shadow-xs group-hover:scale-105 transition shrink-0 overflow-hidden">
+              <img src="/logo.png" alt="Government of Karnataka Emblem" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col justify-center min-w-0">
               <h1 className="text-[11px] sm:text-base font-extrabold text-slate-900 tracking-tight leading-tight group-hover:text-emerald-700 transition uppercase truncate">

@@ -88,8 +88,8 @@ export default function AdminSidebar({ user, isOpen, onClose }: AdminSidebarProp
         {/* Sidebar Header */}
         <div className="h-20 px-6 bg-slate-950/80 flex items-center justify-between border-b border-slate-800">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md">
-              <GraduationCap className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-xl bg-white p-0.5 border border-emerald-500/30 flex items-center justify-center shadow-md shrink-0 overflow-hidden">
+              <img src="/logo.png" alt="Government of Karnataka Emblem" className="w-full h-full object-contain" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-white leading-tight">GPS Jainarkodi</h2>

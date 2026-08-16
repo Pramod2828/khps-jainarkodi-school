@@ -50,31 +50,31 @@ export default function CalendarPublicPage() {
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
       <Navbar />
 
-      <section className="bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 bg-emerald-800/60 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/30">
-            <CalendarIcon className="w-4 h-4" /> Academic Year Schedule
+      <section className="bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto space-y-2.5">
+          <div className="inline-flex items-center gap-1.5 bg-emerald-800/60 text-emerald-200 text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/30">
+            <CalendarIcon className="w-3.5 h-3.5" /> Academic Year Schedule
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Academic Calendar 2026–27</h1>
-          <p className="text-xs sm:text-sm text-slate-200 max-w-2xl">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">Academic Calendar 2026–27</h1>
+          <p className="text-xs sm:text-sm text-slate-200 max-w-2xl leading-relaxed">
             Official schedule of examination dates, school holidays, parent-teacher meetings, and festival celebrations.
           </p>
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 space-y-8">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+      <main className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-6 sm:space-y-8">
+        <div className="bg-white p-2.5 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 overflow-x-auto scrollbar-none">
           <div className="flex items-center gap-2 min-w-max">
-            <span className="text-xs font-bold text-slate-500 mr-2 flex items-center gap-1">
+            <span className="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1 shrink-0">
               <Filter className="w-3.5 h-3.5" /> Event Type:
             </span>
             {['all', 'holiday', 'exam', 'parent_meeting', 'celebration', 'school_event'].map((type) => (
               <button
                 key={type}
                 onClick={() => setSelectedType(type)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase transition ${
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold uppercase transition shrink-0 ${
                   selectedType === type
-                    ? 'bg-emerald-600 text-white shadow-md'
+                    ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
@@ -92,17 +92,17 @@ export default function CalendarPublicPage() {
             message="No calendar events found under this filter."
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {events.map((ev) => (
               <div
                 key={ev.id}
-                className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-start gap-4"
+                className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-start gap-3 sm:gap-4"
               >
-                <div className="bg-emerald-700 text-white text-center p-3 rounded-2xl shrink-0 min-w-[65px] shadow-sm">
-                  <div className="text-xs font-extrabold uppercase">
+                <div className="bg-gradient-to-b from-emerald-600 to-teal-700 text-white text-center p-2.5 sm:p-3 rounded-2xl shrink-0 min-w-[56px] sm:min-w-[65px] shadow-xs">
+                  <div className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider">
                     {new Date(ev.start_date).toLocaleString('default', { month: 'short' })}
                   </div>
-                  <div className="text-xl font-black leading-none my-0.5">
+                  <div className="text-lg sm:text-xl font-black leading-tight my-0.5">
                     {new Date(ev.start_date).getDate()}
                   </div>
                   <div className="text-[9px] font-semibold text-emerald-200">
@@ -110,15 +110,15 @@ export default function CalendarPublicPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5 flex-1">
+                <div className="space-y-1.5 flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
                     {getEventBadge(ev.event_type)}
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 leading-snug">{ev.title}</h3>
+                  <h3 className="text-xs sm:text-base font-bold text-slate-900 leading-snug break-words">{ev.title}</h3>
                   {ev.description && (
-                    <p className="text-xs text-slate-600 leading-relaxed">{ev.description}</p>
+                    <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed break-words">{ev.description}</p>
                   )}
-                  <div className="text-[11px] font-semibold text-slate-500 pt-1">
+                  <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 pt-0.5">
                     Date: {ev.start_date} {ev.start_date !== ev.end_date ? `to ${ev.end_date}` : ''}
                   </div>
                 </div>

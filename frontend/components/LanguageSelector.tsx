@@ -66,20 +66,20 @@ export default function LanguageSelector() {
       {/* Hidden Google Translate Target */}
       <div id="google_translate_element" className="hidden" />
 
-      <div className="flex items-center gap-1.5 bg-emerald-800/90 hover:bg-emerald-700/90 text-white px-2.5 py-1 rounded-lg border border-emerald-700/60 shadow-2xs transition">
+      <div className="flex items-center gap-1 bg-emerald-800/90 hover:bg-emerald-700/90 text-white px-1.5 sm:px-2.5 py-1 rounded-lg border border-emerald-700/60 shadow-2xs transition shrink-0 max-w-[105px] sm:max-w-none">
         <Languages className="w-3.5 h-3.5 text-amber-300 shrink-0" />
         <select
           value={selectedLang}
           onChange={(e) => changeLanguage(e.target.value)}
-          className="bg-transparent text-[11px] font-bold text-white outline-none cursor-pointer pr-1"
+          className="bg-transparent text-[10px] sm:text-[11px] font-bold text-white outline-none cursor-pointer pr-0.5 truncate"
           aria-label="Select Language"
         >
-          <option value="en" className="text-slate-900 font-bold">🇬🇧 English</option>
-          <option value="kn" className="text-slate-900 font-bold">🇮🇳 ಕನ್ನಡ (Kannada)</option>
-          <option value="hi" className="text-slate-900 font-bold">🇮🇳 हिंदी (Hindi)</option>
-          <option value="mr" className="text-slate-900 font-bold">🇮🇳 मराठी (Marathi)</option>
-          <option value="te" className="text-slate-900 font-bold">🇮🇳 తెలుగు (Telugu)</option>
-          <option value="ta" className="text-slate-900 font-bold">🇮🇳 தமிழ் (Tamil)</option>
+          <option value="en" className="text-slate-900 font-bold">English</option>
+          <option value="kn" className="text-slate-900 font-bold">ಕನ್ನಡ</option>
+          <option value="hi" className="text-slate-900 font-bold">हिंदी</option>
+          <option value="mr" className="text-slate-900 font-bold">मराठी</option>
+          <option value="te" className="text-slate-900 font-bold">తెలుగు</option>
+          <option value="ta" className="text-slate-900 font-bold">தமிழ்</option>
         </select>
       </div>
     </div>

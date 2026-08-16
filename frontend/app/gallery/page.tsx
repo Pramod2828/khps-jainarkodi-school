@@ -49,26 +49,26 @@ export default function GalleryPublicPage() {
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
       <Navbar />
 
-      <section className="bg-gradient-to-r from-teal-950 via-slate-900 to-emerald-950 text-white py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 bg-teal-800/60 text-teal-200 text-xs font-bold px-3 py-1 rounded-full border border-teal-500/30">
-            <ImageIcon className="w-4 h-4" /> Memorable School Moments
+      <section className="bg-gradient-to-r from-teal-950 via-slate-900 to-emerald-950 text-white py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto space-y-2.5">
+          <div className="inline-flex items-center gap-1.5 bg-teal-800/60 text-teal-200 text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full border border-teal-500/30">
+            <ImageIcon className="w-3.5 h-3.5" /> Memorable School Moments
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">School Photo Gallery</h1>
-          <p className="text-xs sm:text-sm text-slate-200 max-w-2xl">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">School Photo Gallery</h1>
+          <p className="text-xs sm:text-sm text-slate-200 max-w-2xl leading-relaxed">
             Browse captured photos of our campus, classrooms, sports events, cultural programs, and student activities.
           </p>
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 space-y-8">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+      <main className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 space-y-6 sm:space-y-8">
+        <div className="bg-white p-2.5 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 overflow-x-auto scrollbar-none">
           <div className="flex items-center gap-2 min-w-max">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+              className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition shrink-0 ${
                 selectedCategory === 'all'
-                  ? 'bg-emerald-600 text-white shadow-md'
+                  ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
@@ -78,9 +78,9 @@ export default function GalleryPublicPage() {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(String(cat.id))}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+                className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold transition shrink-0 ${
                   selectedCategory === String(cat.id)
-                    ? 'bg-emerald-600 text-white shadow-md'
+                    ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
@@ -98,7 +98,7 @@ export default function GalleryPublicPage() {
             message="No photos found under this category yet."
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
             {galleryPhotos.map((photo) => (
               <div
                 key={photo.id}

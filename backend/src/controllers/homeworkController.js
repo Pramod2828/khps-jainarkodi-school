@@ -186,9 +186,9 @@ async function createHomework(req, res) {
       ]
     );
 
-    const homeworkId = result.insertId;
+    const homeworkId = (result && result.insertId) || (Array.isArray(result) && result[0] ? result[0].id : null);
 
-    if (req.file) {
+    if (req.file && homeworkId) {
       await connection.query(
         `INSERT INTO homework_attachments (homework_id, file_path, file_name, file_type, file_size)
          VALUES (?, ?, ?, ?, ?)`,

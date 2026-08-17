@@ -136,6 +136,8 @@ const pool = {
         const rows = res.rows || [];
         const isInsert = sql.trim().toUpperCase().startsWith('INSERT');
         const insertId = isInsert && rows[0] && rows[0].id ? rows[0].id : res.oid;
+        rows.insertId = insertId;
+        rows.affectedRows = res.rowCount;
         return [rows, { insertId, affectedRows: res.rowCount }];
       } catch (err) {
         if (err.message.includes('relation') || err.message.includes('does not exist') || err.message.includes('column')) {
@@ -147,6 +149,8 @@ const pool = {
             const rows = res.rows || [];
             const isInsert = sql.trim().toUpperCase().startsWith('INSERT');
             const insertId = isInsert && rows[0] && rows[0].id ? rows[0].id : res.oid;
+            rows.insertId = insertId;
+            rows.affectedRows = res.rowCount;
             lastDbError = null;
             return [rows, { insertId, affectedRows: res.rowCount }];
           } catch(retryErr) {
@@ -199,6 +203,8 @@ const pool = {
           const rows = res.rows || [];
           const isInsert = sql.trim().toUpperCase().startsWith('INSERT');
           const insertId = isInsert && rows[0] && rows[0].id ? rows[0].id : res.oid;
+          rows.insertId = insertId;
+          rows.affectedRows = res.rowCount;
           return [rows, { insertId, affectedRows: res.rowCount }];
         },
         beginTransaction: async () => client.query('BEGIN'),
@@ -271,14 +277,19 @@ async function executeSqliteQuery(sql, params = []) {
     return [rows, []];
   } else if (trimmed.startsWith('INSERT')) {
     const result = await db.run(sql, params);
+    const rows = [];
+    rows.insertId = result.lastID;
+    rows.affectedRows = result.changes;
     return [
-      { insertId: result.lastID, affectedRows: result.changes },
+      rows,
       { insertId: result.lastID, affectedRows: result.changes }
     ];
   } else {
     const result = await db.run(sql, params);
+    const rows = [];
+    rows.affectedRows = result.changes;
     return [
-      { affectedRows: result.changes },
+      rows,
       { affectedRows: result.changes }
     ];
   }

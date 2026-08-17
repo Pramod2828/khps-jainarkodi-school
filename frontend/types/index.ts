@@ -38,6 +38,8 @@ export interface Homework {
   teacher_name: string;
   custom_teacher_name?: string;
   custom_subject_name?: string;
+  attachment_url?: string;
+  attachments?: HomeworkAttachment[];
   created_at: string;
   updated_at: string;
   attachment_id?: number;

@@ -1,91 +1,87 @@
 const { pool } = require('../config/db');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { logAudit } = require('../utils/auditLogger');
-const { calculateDayFromDate } = require('../utils/dateHelper');
 const fs = require('fs');
 const path = require('path');
 
 /**
+ * Helper to calculate Day of Week from Date string YYYY-MM-DD
+ */
+function calculateDayFromDate(dateStr) {
+  if (!dateStr) return 'Monday';
+  const d = new Date(dateStr + 'T00:00:00+05:30');
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[d.getDay()] || 'Monday';
+}
+
+/**
  * GET /api/homework
- * Public & Admin Homework list with pagination and filters
+ * Public & Admin homework list with filters & pagination
  */
 async function getHomeworkList(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page || '1'));
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '15')));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '10')));
     const offset = (page - 1) * limit;
 
-    const { class_id, section_id, subject_id, date, search } = req.query;
+    const { class_id, subject_id, search } = req.query;
 
-    let whereClauses = ['1=1'];
+    let whereConditions = ['1=1'];
     let queryParams = [];
 
     if (class_id && class_id !== 'all') {
-      whereClauses.push('h.class_id = ?');
+      whereConditions.push('h.class_id = ?');
       queryParams.push(parseInt(class_id));
-    }
-
-    if (section_id && section_id !== 'all') {
-      whereClauses.push('h.section_id = ?');
-      queryParams.push(parseInt(section_id));
     }
 
     if (subject_id && subject_id !== 'all') {
       if (subject_id === 'OTHER') {
-        whereClauses.push('(h.custom_subject_name IS NOT NULL AND h.custom_subject_name != "")');
+        whereConditions.push('h.custom_subject_name IS NOT NULL AND h.custom_subject_name != \'\'');
       } else {
-        whereClauses.push('h.subject_id = ? AND (h.custom_subject_name IS NULL OR h.custom_subject_name = "")');
+        whereConditions.push('h.subject_id = ?');
         queryParams.push(parseInt(subject_id));
       }
     }
 
-    if (date) {
-      whereClauses.push('h.homework_date = ?');
-      queryParams.push(date);
-    }
-
     if (search) {
-      whereClauses.push('(h.title LIKE ? OR h.description LIKE ? OR u.name LIKE ? OR h.custom_teacher_name LIKE ? OR h.custom_subject_name LIKE ?)');
-      const searchPattern = `%${search.trim()}%`;
-      queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      whereConditions.push('(h.title LIKE ? OR h.description LIKE ? OR h.custom_teacher_name LIKE ? OR h.custom_subject_name LIKE ?)');
+      const s = `%${search}%`;
+      queryParams.push(s, s, s, s);
     }
 
-    const whereSql = whereClauses.join(' AND ');
+    const whereSql = whereConditions.join(' AND ');
 
-    // Guarantee subjects table exists
-    try {
-      await pool.query(`CREATE TABLE IF NOT EXISTS subjects (id SERIAL PRIMARY KEY, subject_name VARCHAR(100) NOT NULL, subject_code VARCHAR(50));`);
-    } catch(e) {}
-
-    const [countRows] = await pool.query(
-      `SELECT COUNT(*) as total
-       FROM homework h
-       LEFT JOIN classes c ON h.class_id = c.id
-       WHERE ${whereSql}`,
-      queryParams
-    );
-
+    const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM homework h WHERE ${whereSql}`, queryParams);
     const total = countRows[0] ? countRows[0].total : 0;
 
     const [rows] = await pool.query(
-      `SELECT h.id, h.class_id, COALESCE(c.class_name, 'Class') as class_name, h.section_id, sec.section_name,
-              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name, 'General') as subject_name, COALESCE(sub.subject_code, 'GEN') as subject_code,
-              h.title, h.description, h.homework_date, h.homework_day, h.homework_time,
-              h.due_date, h.teacher_id, h.custom_teacher_name, h.custom_subject_name,
-              COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              att.file_path, att.file_name, att.file_type, att.file_size,
-              h.created_at, h.updated_at
+      `SELECT h.id, h.class_id, c.class_name, h.section_id, sec.section_name,
+              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name) as subject_name, sub.subject_code,
+              h.title, h.description, h.homework_date, h.homework_day, h.homework_time, h.due_date,
+              h.teacher_id, COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
+              h.attachment_url, h.created_at
        FROM homework h
        LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN sections sec ON h.section_id = sec.id
        LEFT JOIN subjects sub ON h.subject_id = sub.id
        LEFT JOIN users u ON h.teacher_id = u.id
-       LEFT JOIN homework_attachments att ON h.id = att.homework_id
        WHERE ${whereSql}
        ORDER BY h.homework_date DESC, h.id DESC
        LIMIT ? OFFSET ?`,
       [...queryParams, limit, offset]
     );
+
+    // Fetch attachments for each homework
+    for (const hw of rows) {
+      const [attachments] = await pool.query(
+        'SELECT id, file_path, file_name, file_type, file_size FROM homework_attachments WHERE homework_id = ?',
+        [hw.id]
+      );
+      hw.attachments = attachments;
+      if (!hw.attachment_url && attachments.length > 0) {
+        hw.attachment_url = attachments[0].file_path;
+      }
+    }
 
     const totalPages = Math.ceil(total / limit);
 
@@ -109,28 +105,25 @@ async function getHomeworkById(req, res) {
     const { id } = req.params;
 
     const [rows] = await pool.query(
-      `SELECT h.id, h.class_id, c.class_name, h.section_id, sec.section_name,
-              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name, 'General') as subject_name, sub.subject_code,
-              h.title, h.description, h.homework_date, h.homework_day, h.homework_time,
-              h.due_date, h.teacher_id, h.custom_teacher_name, h.custom_subject_name,
-              COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              att.file_path, att.file_name, att.file_type, att.file_size,
-              h.created_at, h.updated_at
+      `SELECT h.*, c.class_name, COALESCE(h.custom_subject_name, sub.subject_name) as subject_name,
+              COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name
        FROM homework h
-       JOIN classes c ON h.class_id = c.id
-       LEFT JOIN sections sec ON h.section_id = sec.id
+       LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN subjects sub ON h.subject_id = sub.id
        LEFT JOIN users u ON h.teacher_id = u.id
-       LEFT JOIN homework_attachments att ON h.id = att.homework_id
        WHERE h.id = ?`,
       [id]
     );
 
     if (rows.length === 0) {
-      return errorResponse(res, 'Homework not found', 404, 'NOT_FOUND');
+      return errorResponse(res, 'Homework assignment not found', 404, 'NOT_FOUND');
     }
 
-    return successResponse(res, rows[0], 'Homework details retrieved');
+    const homework = rows[0];
+    const [attachments] = await pool.query('SELECT * FROM homework_attachments WHERE homework_id = ?', [id]);
+    homework.attachments = attachments;
+
+    return successResponse(res, homework, 'Homework details retrieved');
   } catch (error) {
     return errorResponse(res, 'Failed to fetch homework details', 500, 'SERVER_ERROR', error.message);
   }
@@ -154,15 +147,28 @@ async function createHomework(req, res) {
     let finalSubjectId = subject_id && subject_id !== 'OTHER' ? parseInt(subject_id) : 1;
     const finalCustomSubName = custom_subject_name ? custom_subject_name.trim() : null;
 
-    // Auto calculate homework day using Asia/Kolkata date helper
     const homework_day = calculateDayFromDate(homework_date);
     const timeFormatted = homework_time || '16:00:00';
-    const assignedTeacherId = teacher_id ? parseInt(teacher_id) : req.user.id;
+    const assignedTeacherId = teacher_id ? parseInt(teacher_id) : (req.user ? req.user.id : 1);
+
+    // Handle attachment if uploaded via multer
+    let attachmentUrl = null;
+    if (req.file) {
+      attachmentUrl = `/uploads/${req.file.filename}`;
+      try {
+        if (fs.existsSync(req.file.path)) {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          const base64Str = fileBuffer.toString('base64');
+          const mimeType = req.file.mimetype || 'application/octet-stream';
+          attachmentUrl = `data:${mimeType};base64,${base64Str}`;
+        }
+      } catch (e) {}
+    }
 
     // Insert homework
     const [result] = await connection.query(
-      `INSERT INTO homework (class_id, section_id, subject_id, custom_subject_name, title, description, homework_date, homework_day, homework_time, due_date, teacher_id, custom_teacher_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO homework (class_id, section_id, subject_id, custom_subject_name, title, description, homework_date, homework_day, homework_time, due_date, teacher_id, custom_teacher_name, attachment_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         parseInt(class_id),
         section_id ? parseInt(section_id) : null,
@@ -175,35 +181,33 @@ async function createHomework(req, res) {
         timeFormatted,
         due_date,
         assignedTeacherId,
-        custom_teacher_name ? custom_teacher_name.trim() : null
+        custom_teacher_name ? custom_teacher_name.trim() : null,
+        attachmentUrl
       ]
     );
 
     const homeworkId = result.insertId;
 
-    // Handle attachment if uploaded
     if (req.file) {
-      const filePath = `/uploads/${req.file.filename}`;
       await connection.query(
         `INSERT INTO homework_attachments (homework_id, file_path, file_name, file_type, file_size)
          VALUES (?, ?, ?, ?, ?)`,
-        [homeworkId, filePath, req.file.originalname, req.file.mimetype, req.file.size]
+        [homeworkId, attachmentUrl, req.file.originalname, req.file.mimetype, req.file.size]
       );
     }
 
     await connection.commit();
 
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Teacher',
       action: 'CREATE_HOMEWORK',
       module: 'HOMEWORK',
       recordId: homeworkId,
-      ipAddress: req.ip,
       details: `Created homework "${title}" for class ID ${class_id}`
     });
 
-    return successResponse(res, { id: homeworkId, title }, 'Homework created successfully', 201);
+    return successResponse(res, { id: homeworkId, title, attachment_url: attachmentUrl }, 'Homework created successfully', 201);
   } catch (error) {
     await connection.rollback();
     console.error('createHomework Error:', error);
@@ -215,7 +219,6 @@ async function createHomework(req, res) {
 
 /**
  * PUT /api/homework/:id
- * Protected: Teacher / Admin
  */
 async function updateHomework(req, res) {
   const connection = await pool.getConnection();
@@ -235,6 +238,25 @@ async function updateHomework(req, res) {
     const finalCustomSubName = custom_subject_name !== undefined ? (custom_subject_name ? custom_subject_name.trim() : null) : existing[0].custom_subject_name;
     const homework_day = homework_date ? calculateDayFromDate(homework_date) : existing[0].homework_day;
 
+    let attachmentUrl = existing[0].attachment_url;
+    if (req.file) {
+      attachmentUrl = `/uploads/${req.file.filename}`;
+      try {
+        if (fs.existsSync(req.file.path)) {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          const base64Str = fileBuffer.toString('base64');
+          const mimeType = req.file.mimetype || 'application/octet-stream';
+          attachmentUrl = `data:${mimeType};base64,${base64Str}`;
+        }
+      } catch (e) {}
+
+      await connection.query(
+        `INSERT INTO homework_attachments (homework_id, file_path, file_name, file_type, file_size)
+         VALUES (?, ?, ?, ?, ?)`,
+        [id, attachmentUrl, req.file.originalname, req.file.mimetype, req.file.size]
+      );
+    }
+
     await connection.query(
       `UPDATE homework SET
         class_id = COALESCE(?, class_id),
@@ -248,7 +270,8 @@ async function updateHomework(req, res) {
         homework_time = COALESCE(?, homework_time),
         due_date = COALESCE(?, due_date),
         teacher_id = COALESCE(?, teacher_id),
-        custom_teacher_name = ?
+        custom_teacher_name = ?,
+        attachment_url = COALESCE(?, attachment_url)
        WHERE id = ?`,
       [
         class_id ? parseInt(class_id) : null,
@@ -262,44 +285,25 @@ async function updateHomework(req, res) {
         homework_time || null,
         due_date || null,
         teacher_id ? parseInt(teacher_id) : null,
-        custom_teacher_name !== undefined ? (custom_teacher_name ? custom_teacher_name.trim() : null) : existing[0].custom_teacher_name,
+        custom_teacher_name ? custom_teacher_name.trim() : null,
+        attachmentUrl,
         id
       ]
     );
 
-    // If new attachment uploaded, replace old
-    if (req.file) {
-      const [oldAttachments] = await connection.query('SELECT file_path FROM homework_attachments WHERE homework_id = ?', [id]);
-      for (const att of oldAttachments) {
-        const fullPath = path.join(__dirname, '../../', att.file_path);
-        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-      }
-      await connection.query('DELETE FROM homework_attachments WHERE homework_id = ?', [id]);
-
-      const filePath = `/uploads/${req.file.filename}`;
-      await connection.query(
-        `INSERT INTO homework_attachments (homework_id, file_path, file_name, file_type, file_size)
-         VALUES (?, ?, ?, ?, ?)`,
-        [id, filePath, req.file.originalname, req.file.mimetype, req.file.size]
-      );
-    }
-
     await connection.commit();
 
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Teacher',
       action: 'UPDATE_HOMEWORK',
       module: 'HOMEWORK',
-      recordId: id,
-      ipAddress: req.ip,
-      details: `Updated homework ID ${id}`
+      recordId: id
     });
 
-    return successResponse(res, null, 'Homework updated successfully');
+    return successResponse(res, null, 'Homework assignment updated successfully');
   } catch (error) {
     await connection.rollback();
-    console.error('updateHomework Error:', error);
     return errorResponse(res, 'Failed to update homework', 500, 'SERVER_ERROR', error.message);
   } finally {
     connection.release();
@@ -308,49 +312,29 @@ async function updateHomework(req, res) {
 
 /**
  * DELETE /api/homework/:id
- * Protected: Teacher / Admin
  */
 async function deleteHomework(req, res) {
-  const connection = await pool.getConnection();
   try {
-    await connection.beginTransaction();
-
     const { id } = req.params;
 
-    // Remove attachment files from storage
-    const [attachments] = await connection.query('SELECT file_path FROM homework_attachments WHERE homework_id = ?', [id]);
-    for (const att of attachments) {
-      const fullPath = path.join(__dirname, '../../', att.file_path);
-      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-    }
-
-    await connection.query('DELETE FROM homework_attachments WHERE homework_id = ?', [id]);
-    const [result] = await connection.query('DELETE FROM homework WHERE id = ?', [id]);
+    await pool.query('DELETE FROM homework_attachments WHERE homework_id = ?', [id]);
+    const [result] = await pool.query('DELETE FROM homework WHERE id = ?', [id]);
 
     if (result.affectedRows === 0) {
-      await connection.rollback();
-      connection.release();
-      return errorResponse(res, 'Homework not found', 404, 'NOT_FOUND');
+      return errorResponse(res, 'Homework assignment not found', 404, 'NOT_FOUND');
     }
 
-    await connection.commit();
-
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Teacher',
       action: 'DELETE_HOMEWORK',
       module: 'HOMEWORK',
-      recordId: id,
-      ipAddress: req.ip
+      recordId: id
     });
 
     return successResponse(res, null, 'Homework deleted successfully');
   } catch (error) {
-    await connection.rollback();
-    console.error('deleteHomework Error:', error);
     return errorResponse(res, 'Failed to delete homework', 500, 'SERVER_ERROR', error.message);
-  } finally {
-    connection.release();
   }
 }
 

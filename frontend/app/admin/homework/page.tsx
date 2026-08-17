@@ -6,9 +6,9 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/AdminHeader';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
-import { api } from '@/services/api';
+import { api, getAssetUrl } from '@/services/api';
 import { User, Homework, ClassItem, SubjectItem } from '@/types';
-import { BookOpen, Plus, Search, Edit3, Trash2, X, UserCheck } from 'lucide-react';
+import { BookOpen, Plus, Search, Edit3, Trash2, X, UserCheck, FileText, Download, Eye } from 'lucide-react';
 
 export default function AdminHomeworkPage() {
   const router = useRouter();
@@ -117,8 +117,8 @@ export default function AdminHomeworkPage() {
 
     setTitle(hw.title);
     setDescription(hw.description);
-    setHomeworkDate(hw.homework_date);
-    setDueDate(hw.due_date);
+    setHomeworkDate(hw.homework_date ? hw.homework_date.substring(0, 10) : new Date().toISOString().split('T')[0]);
+    setDueDate(hw.due_date ? hw.due_date.substring(0, 10) : new Date(Date.now() + 86400000).toISOString().split('T')[0]);
     setFile(null);
 
     if (hw.custom_teacher_name) {
@@ -166,19 +166,16 @@ export default function AdminHomeworkPage() {
       if (file) formData.append('attachment', file);
 
       if (editingHomework) {
-        await api.put(`/homework/${editingHomework.id}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await api.put(`/homework/${editingHomework.id}`, formData);
       } else {
-        await api.post('/homework', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await api.post('/homework', formData);
       }
 
       setIsModalOpen(false);
       loadHomework();
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to save homework');
+      const msg = err.response?.data?.error?.details || err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to save homework';
+      alert(`Save Homework Notice: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -189,8 +186,8 @@ export default function AdminHomeworkPage() {
     try {
       await api.delete(`/homework/${id}`);
       loadHomework();
-    } catch (err) {
-      alert('Failed to delete homework assignment.');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete homework assignment.');
     }
   };
 
@@ -265,6 +262,7 @@ export default function AdminHomeworkPage() {
                       <th className="py-3.5 px-4">Class</th>
                       <th className="py-3.5 px-4">Subject</th>
                       <th className="py-3.5 px-4">Title</th>
+                      <th className="py-3.5 px-4">Attachment</th>
                       <th className="py-3.5 px-4">Date (Day)</th>
                       <th className="py-3.5 px-4">Due Date</th>
                       <th className="py-3.5 px-4">Assigned Teacher</th>
@@ -272,29 +270,48 @@ export default function AdminHomeworkPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {homeworkList.map((hw) => (
-                      <tr key={hw.id} className="hover:bg-slate-50">
-                        <td className="py-3 px-4 font-bold text-slate-900">{hw.class_name}</td>
-                        <td className="py-3 px-4 font-semibold text-emerald-700">{hw.subject_name}</td>
-                        <td className="py-3 px-4 max-w-xs font-bold text-slate-800 truncate">{hw.title}</td>
-                        <td className="py-3 px-4 text-slate-600">{hw.homework_date} ({hw.homework_day})</td>
-                        <td className="py-3 px-4 font-bold text-rose-600">{hw.due_date}</td>
-                        <td className="py-3 px-4">
-                          <span className="bg-blue-50 text-blue-800 font-bold px-2.5 py-1 rounded-lg border border-blue-100 inline-flex items-center gap-1">
-                            <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                            {hw.teacher_name}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
-                          <button onClick={() => handleOpenEditModal(hw)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit Homework">
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDelete(hw.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded" title="Delete Homework">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {homeworkList.map((hw) => {
+                      const attachUrl = hw.attachment_url || (hw.attachments && hw.attachments[0] ? hw.attachments[0].file_path : null);
+                      const isImage = attachUrl && (attachUrl.startsWith('data:image') || attachUrl.endsWith('.png') || attachUrl.endsWith('.jpg') || attachUrl.endsWith('.jpeg') || attachUrl.endsWith('.webp'));
+                      return (
+                        <tr key={hw.id} className="hover:bg-slate-50">
+                          <td className="py-3 px-4 font-bold text-slate-900">{hw.class_name}</td>
+                          <td className="py-3 px-4 font-semibold text-emerald-700">{hw.subject_name}</td>
+                          <td className="py-3 px-4 max-w-xs font-bold text-slate-800 truncate">{hw.title}</td>
+                          <td className="py-3 px-4">
+                            {attachUrl ? (
+                              <a
+                                href={getAssetUrl(attachUrl)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 hover:bg-emerald-100"
+                              >
+                                {isImage ? <Eye className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
+                                {isImage ? 'View Image' : 'Download Attachment'}
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 italic">No File</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-slate-600">{hw.homework_date ? hw.homework_date.substring(0, 10) : ''} ({hw.homework_day})</td>
+                          <td className="py-3 px-4 font-bold text-rose-600">{hw.due_date ? hw.due_date.substring(0, 10) : ''}</td>
+                          <td className="py-3 px-4">
+                            <span className="bg-blue-50 text-blue-800 font-bold px-2.5 py-1 rounded-lg border border-blue-100 inline-flex items-center gap-1">
+                              <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                              {hw.teacher_name}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+                            <button onClick={() => handleOpenEditModal(hw)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit Homework">
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDelete(hw.id)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded" title="Delete Homework">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -342,7 +359,7 @@ export default function AdminHomeworkPage() {
                 </div>
               </div>
 
-              {/* One-time Custom Subject Text Field */}
+              {/* Custom Subject Input */}
               <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-200/70 space-y-1">
                 <label className="block font-bold text-emerald-900 text-[11px]">
                   Or Write Custom Subject (One-time choice, NOT saved to subject list):
@@ -361,14 +378,12 @@ export default function AdminHomeworkPage() {
                 />
               </div>
 
-              {/* Compulsory Teacher Selection Field */}
+              {/* Teacher Selection */}
               <div className="bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200/80 space-y-2">
                 <label className="block font-extrabold text-blue-900 flex items-center gap-1.5">
                   <UserCheck className="w-4 h-4 text-blue-700" />
                   Assigned Teacher Name * <span className="text-rose-600 text-[10px] font-extrabold uppercase">(Compulsory)</span>
                 </label>
-                <p className="text-[11px] text-blue-700">Select which teacher gave this homework assignment:</p>
-
                 <select
                   value={teacherSelectMode}
                   onChange={(e) => setTeacherSelectMode(e.target.value)}
@@ -386,7 +401,6 @@ export default function AdminHomeworkPage() {
                   <option value="CUSTOM">+ Enter Other / Custom Teacher Name...</option>
                 </select>
 
-                {/* If Custom Teacher Name Selected */}
                 {teacherSelectMode === 'CUSTOM' && (
                   <div className="pt-2">
                     <label className="block font-bold text-rose-700 mb-1 flex items-center gap-1">

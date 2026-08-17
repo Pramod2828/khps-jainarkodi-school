@@ -46,7 +46,7 @@ function getPgPool() {
 let isMigrating = false;
 let isMigrated = false;
 
-// Ensure schema migration finishes before queries execute
+// Ensure schema migration finishes once at application startup
 async function ensurePostgresMigrated() {
   const p = getPgPool();
   if (!p || isMigrated) return;
@@ -91,7 +91,10 @@ function convertSqlForPg(sql, params = []) {
   let paramIndex = 1;
   let pgSql = sql
     .replace(/\bNOW\(\)/gi, 'CURRENT_TIMESTAMP')
-    .replace(/\bCURDATE\(\)/gi, 'CURRENT_DATE');
+    .replace(/\bCURDATE\(\)/gi, 'CURRENT_DATE')
+    .replace(/DATE\('now',\s*['"]localtime['"]\)/gi, 'CURRENT_DATE')
+    .replace(/DATE\('now',\s*['"]-?(\d+)\s*day['"]\)/gi, "CURRENT_DATE - INTERVAL '$1 day'")
+    .replace(/DATE\('now'\)/gi, 'CURRENT_DATE');
 
   pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
 
@@ -118,7 +121,10 @@ const pool = {
         throw new Error('Cloud PostgreSQL connection pool unavailable: ' + (lastDbError || 'Init error'));
       }
 
-      await ensurePostgresMigrated();
+      if (!isMigrated) {
+        await ensurePostgresMigrated();
+      }
+
       try {
         const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
         const res = await activePgPool.query(pgSql, pgParams);
@@ -177,7 +183,9 @@ const pool = {
       if (!activePgPool) {
         throw new Error('Cloud PostgreSQL connection pool unavailable');
       }
-      await ensurePostgresMigrated();
+      if (!isMigrated) {
+        await ensurePostgresMigrated();
+      }
       const client = await activePgPool.connect();
       return {
         query: async (sql, params) => {

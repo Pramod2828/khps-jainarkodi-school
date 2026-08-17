@@ -6,23 +6,25 @@ export function getDynamicApiUrl(): string {
   }
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-    return `http://${host}:5000/api`;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:5000/api';
+    }
+    return 'https://khps-jainarkodi-school.onrender.com/api';
   }
-  return 'http://localhost:5000/api';
+  return 'https://khps-jainarkodi-school.onrender.com/api';
 }
 
 export const api = axios.create({
   baseURL: getDynamicApiUrl(),
   withCredentials: true,
   headers: {
-    'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0'
   },
 });
 
-// Update dynamic baseURL on client-side requests
+// Update dynamic baseURL & auth header on client-side requests
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     config.baseURL = getDynamicApiUrl();
@@ -34,15 +36,25 @@ api.interceptors.request.use((config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
+
+  // Allow browser/Axios to automatically set multipart/form-data boundary for FormData
   if (config.data instanceof FormData) {
-    delete config.headers['Content-Type'];
+    if (config.headers) {
+      if (typeof (config.headers as any).delete === 'function') {
+        (config.headers as any).delete('Content-Type');
+        (config.headers as any).delete('content-type');
+      } else {
+        delete config.headers['Content-Type'];
+        delete config.headers['content-type'];
+      }
+    }
   }
   return config;
 }, (error) => {
   return Promise.reject(error);
 });
 
-// Handle 401 Unauthorized globally by redirecting to /login
+// Handle 401 Unauthorized globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -60,7 +72,7 @@ api.interceptors.response.use(
 // Helper to construct absolute image/file URL from backend
 export function getAssetUrl(filePath: string | undefined | null): string {
   if (!filePath) return '/placeholder.png';
-  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+  if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('data:')) {
     return filePath;
   }
   const baseUrl = getDynamicApiUrl().replace('/api', '');

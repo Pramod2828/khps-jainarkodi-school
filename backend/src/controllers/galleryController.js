@@ -37,13 +37,13 @@ async function getGallery(req, res) {
     }
 
     const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM gallery g WHERE ${whereSql}`, queryParams);
-    const total = countRows[0].total;
+    const total = countRows[0] ? countRows[0].total : 0;
 
     const [rows] = await pool.query(
-      `SELECT g.id, g.title, g.description, g.category_id, gc.category_name, g.image_url, g.uploaded_by, u.name as uploader_name, g.created_at
+      `SELECT g.id, g.title, g.description, g.category_id, COALESCE(gc.category_name, 'General') as category_name, g.image_url, g.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, g.created_at
        FROM gallery g
-       JOIN gallery_categories gc ON g.category_id = gc.id
-       JOIN users u ON g.uploaded_by = u.id
+       LEFT JOIN gallery_categories gc ON g.category_id = gc.id
+       LEFT JOIN users u ON g.uploaded_by = u.id
        WHERE ${whereSql}
        ORDER BY g.created_at DESC
        LIMIT ? OFFSET ?`,
@@ -100,15 +100,17 @@ async function uploadGalleryPhoto(req, res) {
       console.warn('⚠️ Could not convert image to base64, falling back to upload path:', e.message);
     }
 
+    const userId = req.user ? req.user.id : 1;
+
     const [result] = await pool.query(
       `INSERT INTO gallery (title, description, category_id, image_url, uploaded_by)
        VALUES (?, ?, ?, ?, ?)`,
-      [title ? title.trim() : 'School Photo', description ? description.trim() : null, parseInt(category_id), imageUrl, req.user.id]
+      [title ? title.trim() : 'School Photo', description ? description.trim() : null, parseInt(category_id), imageUrl, userId]
     );
 
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: userId,
+      userName: req.user ? req.user.name : 'Admin',
       action: 'UPLOAD_GALLERY',
       module: 'GALLERY',
       recordId: result.insertId,
@@ -117,6 +119,7 @@ async function uploadGalleryPhoto(req, res) {
 
     return successResponse(res, { id: result.insertId, image_url: imageUrl }, 'Photo uploaded successfully', 201);
   } catch (error) {
+    console.error('uploadGalleryPhoto error:', error);
     return errorResponse(res, 'Failed to upload photo', 500, 'SERVER_ERROR', error.message);
   }
 }
@@ -133,14 +136,16 @@ async function deleteGalleryPhoto(req, res) {
       return errorResponse(res, 'Photo not found', 404, 'NOT_FOUND');
     }
 
-    const fullPath = path.join(__dirname, '../../', existing[0].image_url);
-    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+    if (existing[0].image_url && !existing[0].image_url.startsWith('data:')) {
+      const fullPath = path.join(__dirname, '../../', existing[0].image_url);
+      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+    }
 
     await pool.query('DELETE FROM gallery WHERE id = ?', [id]);
 
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Admin',
       action: 'DELETE_GALLERY',
       module: 'GALLERY',
       recordId: id

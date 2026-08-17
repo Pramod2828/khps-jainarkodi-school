@@ -244,7 +244,8 @@ async function migratePostgres(connectionString) {
       try {
         await pool.query(q);
       } catch (tableErr) {
-        console.warn(`Table Query Warning: ${tableErr.message}`);
+        console.error(`Table Query Warning: ${tableErr.message} (Query: ${q.substring(0, 50)})`);
+        lastDbError = `Create Table Error (${tableErr.message})`;
       }
     }
 

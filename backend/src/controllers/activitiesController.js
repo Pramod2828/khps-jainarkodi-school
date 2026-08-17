@@ -18,9 +18,9 @@ async function getActivities(req, res) {
     const total = countRows[0].total;
 
     const [rows] = await pool.query(
-      `SELECT a.id, a.title, a.description, a.activity_date, a.cover_image, a.video_url, a.created_by, u.name as author_name, a.created_at
+      `SELECT a.id, a.title, a.description, a.activity_date, a.cover_image, a.video_url, a.created_by, COALESCE(u.name, 'Teacher') as author_name, a.created_at
        FROM activities a
-       JOIN users u ON a.created_by = u.id
+       LEFT JOIN users u ON a.created_by = u.id
        ORDER BY a.activity_date DESC, a.created_at DESC
        LIMIT ? OFFSET ?`,
       [limit, offset]
@@ -48,9 +48,9 @@ async function getActivityById(req, res) {
     const { id } = req.params;
 
     const [rows] = await pool.query(
-      `SELECT a.id, a.title, a.description, a.activity_date, a.cover_image, a.video_url, a.created_by, u.name as author_name, a.created_at
+      `SELECT a.id, a.title, a.description, a.activity_date, a.cover_image, a.video_url, a.created_by, COALESCE(u.name, 'Teacher') as author_name, a.created_at
        FROM activities a
-       JOIN users u ON a.created_by = u.id
+       LEFT JOIN users u ON a.created_by = u.id
        WHERE a.id = ?`,
       [id]
     );
@@ -89,18 +89,31 @@ async function createActivity(req, res) {
     let coverImage = null;
 
     // Handle files uploaded via multer fields or array
+    let rawCoverFile = null;
     if (req.files) {
       if (req.files['cover_image'] && req.files['cover_image'][0]) {
-        coverImage = `/uploads/${req.files['cover_image'][0].filename}`;
+        rawCoverFile = req.files['cover_image'][0];
       } else if (Array.isArray(req.files) && req.files.length > 0) {
-        coverImage = `/uploads/${req.files[0].filename}`;
+        rawCoverFile = req.files[0];
       }
+    }
+
+    if (rawCoverFile) {
+      coverImage = `/uploads/${rawCoverFile.filename}`;
+      try {
+        if (fs.existsSync(rawCoverFile.path)) {
+          const fileBuffer = fs.readFileSync(rawCoverFile.path);
+          const base64Str = fileBuffer.toString('base64');
+          const mimeType = rawCoverFile.mimetype || 'image/jpeg';
+          coverImage = `data:${mimeType};base64,${base64Str}`;
+        }
+      } catch (e) {}
     }
 
     const [result] = await connection.query(
       `INSERT INTO activities (title, description, activity_date, cover_image, video_url, created_by)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [title.trim(), description.trim(), activity_date, coverImage, video_url || null, req.user.id]
+      [title.trim(), description.trim(), activity_date, coverImage, video_url || null, req.user ? req.user.id : 1]
     );
 
     const activityId = result.insertId;
@@ -108,7 +121,16 @@ async function createActivity(req, res) {
     // Additional gallery images for activity
     if (req.files && req.files['gallery_images']) {
       for (const file of req.files['gallery_images']) {
-        const imgUrl = `/uploads/${file.filename}`;
+        let imgUrl = `/uploads/${file.filename}`;
+        try {
+          if (fs.existsSync(file.path)) {
+            const fileBuffer = fs.readFileSync(file.path);
+            const base64Str = fileBuffer.toString('base64');
+            const mimeType = file.mimetype || 'image/jpeg';
+            imgUrl = `data:${mimeType};base64,${base64Str}`;
+          }
+        } catch (e) {}
+
         await connection.query(
           'INSERT INTO activity_images (activity_id, image_url) VALUES (?, ?)',
           [activityId, imgUrl]

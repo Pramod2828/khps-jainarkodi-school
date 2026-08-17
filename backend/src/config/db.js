@@ -191,12 +191,18 @@ async function testConnection() {
       const client = await pgPool.connect();
       console.log('✅ Cloud PostgreSQL Database connected successfully.');
       client.release();
+      lastDbError = null;
       return true;
     } catch (err) {
-      console.warn('⚠️ Cloud PostgreSQL unavailable. Switching to Embedded SQLite Database...');
-      useSqlite = true;
-      await getSqliteDb();
-      return true;
+      console.warn('⚠️ Cloud PostgreSQL unavailable:', err.message);
+      lastDbError = err.message;
+      if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) {
+        // Do not silently switch to SQLite if DATABASE_URL is explicitly set
+      } else {
+        useSqlite = true;
+        await getSqliteDb();
+      }
+      return false;
     }
   }
 
@@ -213,6 +219,8 @@ async function testConnection() {
   }
 }
 
+let lastDbError = null;
+
 function getDbDriverInfo() {
   if (useSqlite || process.env.DB_TYPE === 'sqlite') return 'SQLITE_EMBEDDED';
   if (dbDriver === 'postgres' && pgPool) return 'POSTGRESQL';
@@ -220,8 +228,13 @@ function getDbDriverInfo() {
   return 'SQLITE_EMBEDDED';
 }
 
+function getDbError() {
+  return lastDbError;
+}
+
 module.exports = {
   pool,
   testConnection,
-  getDbDriverInfo
+  getDbDriverInfo,
+  getDbError
 };

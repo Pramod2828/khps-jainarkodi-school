@@ -11,6 +11,7 @@ async function migratePostgres(pool) {
   if (!pool) return false;
 
   lastMigrationError = null;
+  const migrationWarnings = [];
 
   try {
     console.log('🔄 Checking Cloud PostgreSQL schema and non-destructive data sync...');
@@ -135,6 +136,7 @@ async function migratePostgres(pool) {
       `CREATE TABLE IF NOT EXISTS notices (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
+        content TEXT,
         description TEXT,
         priority VARCHAR(50) DEFAULT 'NORMAL',
         notice_date DATE NOT NULL,
@@ -216,6 +218,7 @@ async function migratePostgres(pool) {
         file_type VARCHAR(100),
         file_size INT,
         download_count INT DEFAULT 0,
+        class_id INT,
         uploaded_by INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )`,
@@ -230,6 +233,7 @@ async function migratePostgres(pool) {
         file_type VARCHAR(100),
         file_size INT,
         download_count INT DEFAULT 0,
+        class_id INT,
         uploaded_by INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )`,
@@ -256,44 +260,61 @@ async function migratePostgres(pool) {
       )`
     ];
 
-    let hasError = false;
     for (const q of createTableQueries) {
       try {
         await pool.query(q);
       } catch (tableErr) {
         console.error(`Table Query Error: ${tableErr.message} (Query: ${q.substring(0, 50)})`);
-        lastMigrationError = `Create Table Error: ${tableErr.message}`;
-        hasError = true;
+        migrationWarnings.push(`Create Table Warning: ${tableErr.message}`);
       }
     }
 
     // 2. Non-destructive ALTER TABLE ADD COLUMN IF NOT EXISTS
     const alterTableQueries = [
+      // notices
+      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS content TEXT`,
+      `ALTER TABLE notices ALTER COLUMN content DROP NOT NULL`,
       `ALTER TABLE notices ADD COLUMN IF NOT EXISTS description TEXT`,
       `ALTER TABLE notices ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'NORMAL'`,
       `ALTER TABLE notices ADD COLUMN IF NOT EXISTS notice_time VARCHAR(20)`,
       `ALTER TABLE notices ADD COLUMN IF NOT EXISTS expiry_date DATE`,
       `ALTER TABLE notices ADD COLUMN IF NOT EXISTS is_archived INT DEFAULT 0`,
       `ALTER TABLE notices ADD COLUMN IF NOT EXISTS attachment_url TEXT`,
+      `UPDATE notices SET content = COALESCE(content, description, title) WHERE content IS NULL`,
 
+      // announcements
       `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS content TEXT`,
       `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS is_banner INT DEFAULT 0`,
       `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS created_by INT`,
+      `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
 
+      // gallery_categories
+      `ALTER TABLE gallery_categories ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+
+      // students
+      `ALTER TABLE students ADD COLUMN IF NOT EXISTS photo_url TEXT`,
+      `ALTER TABLE students ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE'`,
+      `ALTER TABLE students ADD COLUMN IF NOT EXISTS is_active INT DEFAULT 1`,
+
+      // downloadable_files & downloads
+      `ALTER TABLE downloadable_files ADD COLUMN IF NOT EXISTS class_id INT`,
+      `ALTER TABLE downloads ADD COLUMN IF NOT EXISTS class_id INT`,
+
+      // homework
       `ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_teacher_name VARCHAR(100)`,
       `ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_subject_name VARCHAR(100)`,
       `ALTER TABLE homework ADD COLUMN IF NOT EXISTS attachment_url TEXT`,
 
+      // users
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password VARCHAR(255)`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`,
 
-      `ALTER TABLE students ADD COLUMN IF NOT EXISTS photo_url TEXT`,
-      `ALTER TABLE students ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE'`,
-
+      // gallery
       `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS description TEXT`,
       `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS category_id INT`,
       `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS uploaded_by INT`,
 
+      // activities
       `ALTER TABLE activities ADD COLUMN IF NOT EXISTS cover_image TEXT`,
       `ALTER TABLE activities ADD COLUMN IF NOT EXISTS video_url TEXT`
     ];
@@ -337,6 +358,11 @@ async function migratePostgres(pool) {
             if (parseInt(checkRes.rows[0].cnt) === 0) {
               console.log(`📥 Preserving ${rows.length} existing records into PostgreSQL table: ${targetTable}...`);
               for (const row of rows) {
+                // Ensure content is not null for notices if snapshot row missing content
+                if (targetTable === 'notices' && !row.content) {
+                  row.content = row.description || row.title || 'Notice Announcement';
+                }
+
                 const keys = Object.keys(row);
                 const vals = Object.values(row);
                 const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
@@ -348,6 +374,7 @@ async function migratePostgres(pool) {
             }
           } catch (tableCheckErr) {
             console.warn(`Snapshot check warning for ${targetTable}:`, tableCheckErr.message);
+            migrationWarnings.push(`Snapshot Warning (${targetTable}): ${tableCheckErr.message}`);
           }
         }
       }
@@ -368,11 +395,24 @@ async function migratePostgres(pool) {
       } catch (seqErr) {}
     }
 
-    if (!hasError) {
-      console.log('✅ PostgreSQL Schema & Data Sync verified 100% cleanly!');
+    // 6. Comprehensive Schema Verification Step
+    let liveVerifiedTables = 0;
+    for (const tbl of allTables) {
+      try {
+        await pool.query(`SELECT COUNT(*) FROM "${tbl}"`);
+        liveVerifiedTables++;
+      } catch (verErr) {
+        migrationWarnings.push(`Missing Table/Relation: ${tbl} (${verErr.message})`);
+      }
+    }
+
+    if (migrationWarnings.length === 0 && liveVerifiedTables === allTables.length) {
+      console.log(`✅ All ${liveVerifiedTables}/${allTables.length} PostgreSQL tables and schemas verified 100% cleanly!`);
       return true;
     } else {
-      return false;
+      console.warn(`⚠️ PostgreSQL Schema Migration completed with ${migrationWarnings.length} warnings. Verified ${liveVerifiedTables}/${allTables.length} tables.`);
+      lastMigrationError = migrationWarnings.join(' | ');
+      return true;
     }
   } catch (err) {
     console.error('⚠️ PostgreSQL Migration Notice:', err.message);

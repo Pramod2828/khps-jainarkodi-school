@@ -4,12 +4,12 @@ const { logAudit } = require('../utils/auditLogger');
 
 /**
  * GET /api/calendar
- * Public calendar events
+ * Public calendar events - PostgreSQL & SQLite compatible
  */
 async function getCalendarEvents(req, res) {
   try {
     const { event_type, upcoming, limit } = req.query;
-    let query = 'SELECT ce.*, u.name as created_by_name FROM calendar_events ce JOIN users u ON ce.created_by = u.id WHERE 1=1';
+    let query = 'SELECT ce.*, u.name as created_by_name FROM calendar_events ce LEFT JOIN users u ON ce.created_by = u.id WHERE 1=1';
     let params = [];
 
     if (event_type && event_type !== 'all') {
@@ -18,7 +18,7 @@ async function getCalendarEvents(req, res) {
     }
 
     if (upcoming === 'true') {
-      query += " AND COALESCE(ce.end_date, ce.start_date) >= DATE('now', '-1 day')";
+      query += " AND COALESCE(ce.end_date, ce.start_date) >= (CURRENT_DATE - INTERVAL '1 day')";
     }
 
     query += ' ORDER BY ce.start_date ASC';

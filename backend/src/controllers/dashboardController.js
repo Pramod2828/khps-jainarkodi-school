@@ -3,19 +3,19 @@ const { successResponse, errorResponse } = require('../utils/apiResponse');
 
 /**
  * GET /api/dashboard/stats
- * Real-time statistics strictly computed from SQL queries
+ * Real-time statistics strictly computed from SQL queries - PostgreSQL & SQLite compatible
  */
 async function getDashboardStats(req, res) {
   try {
-    const [[studentsCount]] = await pool.query("SELECT COUNT(*) as total FROM students WHERE status = 'ACTIVE'");
-    const [[teachersCount]] = await pool.query("SELECT COUNT(*) as total FROM users u JOIN roles r ON u.role_id = r.id WHERE r.role_name = 'TEACHER' AND u.status = 'ACTIVE'");
+    const [[studentsCount]] = await pool.query("SELECT COUNT(*) as total FROM students WHERE status = 'ACTIVE' OR is_active = 1");
+    const [[teachersCount]] = await pool.query("SELECT COUNT(*) as total FROM users u JOIN roles r ON u.role_id = r.id WHERE (r.role_name = 'TEACHER' OR r.role_name = 'ADMIN') AND (u.status = 'ACTIVE' OR u.status IS NULL)");
     const [[classesCount]] = await pool.query('SELECT COUNT(*) as total FROM classes');
     const [[homeworkTotal]] = await pool.query('SELECT COUNT(*) as total FROM homework');
-    const [[homeworkToday]] = await pool.query("SELECT COUNT(*) as total FROM homework WHERE homework_date = DATE('now', 'localtime')");
-    const [[noticesCount]] = await pool.query('SELECT COUNT(*) as total FROM notices WHERE is_archived = 0');
+    const [[homeworkToday]] = await pool.query("SELECT COUNT(*) as total FROM homework WHERE homework_date = CURRENT_DATE");
+    const [[noticesCount]] = await pool.query('SELECT COUNT(*) as total FROM notices WHERE is_archived = 0 OR is_archived IS NULL');
     const [[activitiesCount]] = await pool.query('SELECT COUNT(*) as total FROM activities');
     const [[galleryCount]] = await pool.query('SELECT COUNT(*) as total FROM gallery');
-    const [[upcomingEventsCount]] = await pool.query("SELECT COUNT(*) as total FROM calendar_events WHERE COALESCE(end_date, start_date) >= DATE('now', 'localtime')");
+    const [[upcomingEventsCount]] = await pool.query("SELECT COUNT(*) as total FROM calendar_events WHERE COALESCE(end_date, start_date) >= CURRENT_DATE");
 
     const statsData = {
       total_students: studentsCount ? parseInt(studentsCount.total) : 0,
@@ -70,7 +70,7 @@ async function getDashboardCharts(req, res) {
     const [studentsRaw] = await pool.query(`
       SELECT c.class_name, COUNT(s.id) as count
       FROM classes c
-      LEFT JOIN students s ON c.id = s.class_id AND s.status = 'ACTIVE'
+      LEFT JOIN students s ON c.id = s.class_id AND (s.status = 'ACTIVE' OR s.is_active = 1)
       GROUP BY c.id, c.class_name, c.display_order
       ORDER BY c.display_order ASC
     `);

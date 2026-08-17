@@ -118,12 +118,15 @@ async function initSqliteSchema(db) {
   if (classCount.cnt === 0) {
     await db.exec(`
       INSERT INTO classes (id, class_name, display_order) VALUES
-      (1, 'UKG', 1),
-      (2, '1st Standard', 2),
-      (3, '2nd Standard', 3),
-      (4, '3rd Standard', 4),
-      (5, '4th Standard', 5),
-      (6, '5th Standard', 6);
+      (1, 'UKG', 2),
+      (2, '1st Standard', 3),
+      (3, '2nd Standard', 4),
+      (4, '3rd Standard', 5),
+      (5, '4th Standard', 6),
+      (6, '5th Standard', 7),
+      (7, 'LKG', 1),
+      (8, '6th Standard', 8),
+      (9, '7th Standard', 9);
     `);
   }
 
@@ -196,11 +199,10 @@ async function initSqliteSchema(db) {
   const hwCount = await db.get('SELECT COUNT(*) as cnt FROM homework');
   if (hwCount.cnt === 0) {
     await db.exec(`
-      INSERT INTO homework (class_id, section_id, subject_id, title, description, homework_date, homework_day, homework_time, due_date, teacher_id) VALUES
-      (3, 5, 1, 'Mathematics - Exercise 4', 'Complete questions 1 to 10 from Chapter 4 Multiplication tables.', '2026-08-15', 'Saturday', '16:30:00', '2026-08-17', 2),
-      (1, 1, 4, 'Kannada - Vanamahotsava Poem', 'Recite and write 4 lines of the Kannada nature poem.', '2026-08-15', 'Saturday', '15:00:00', '2026-08-18', 2),
-      (5, 9, 5, 'Science - Plant Parts Diagram', 'Draw and label the parts of a flowering plant in your science workbook.', '2026-08-14', 'Friday', '14:00:00', '2026-08-18', 2),
-      (2, 3, 3, 'English - Word Meaning', 'Write down 5 new words from Lesson 3 with their meanings.', '2026-08-14', 'Friday', '11:30:00', '2026-08-16', 2);
+      INSERT INTO homework (class_id, section_id, subject_id, title, description, homework_date, homework_day, homework_time, due_date, teacher_id, custom_teacher_name, custom_subject_name) VALUES
+      (9, NULL, 1, 'tabels', 'write tabels up to 29', '2026-08-15', 'Saturday', '16:00:00', '2026-08-16', 1, NULL, NULL),
+      (8, NULL, 1, 'chapter 3', 'draw an apple', '2026-08-16', 'Sunday', '16:00:00', '2026-08-17', 1, 'tarun', 'drawing'),
+      (3, 5, 1, 'Mathematics - Exercise 4', 'Complete questions 1 to 10 from Chapter 4 Multiplication tables.', '2026-08-15', 'Saturday', '16:30:00', '2026-08-17', 2, NULL, NULL);
     `);
   }
 
@@ -377,7 +379,7 @@ async function initSqliteSchema(db) {
   if (sCount.cnt === 0) {
     await db.exec(`
       INSERT INTO school_information (id, school_name, tagline, logo_url, address, phone, email, head_teacher, description, timings, map_url) VALUES
-      (1, 'Government Primary School Jainarkodi', 'Learning today, building a better tomorrow.', '/logo.png', 'Jainarkodi Village, Primary School Circle, Karnataka 574227', '+91 94812 34567', 'contact@jainarkodi.edu.in', 'Mrs. Savitha R. Shetty', 'Government Primary School Jainarkodi is dedicated to providing holistic primary education, fostering critical thinking, moral values, and academic excellence for children from 1st to 5th Standard in a warm, nurturing community environment.', 'Monday – Friday: 9:00 AM – 4:00 PM | Saturday: 9:00 AM – 1:00 PM', 'https://maps.google.com/?q=Jainarkodi');
+      (1, 'K H P S JAINARAKODI', 'Learning today, building a better tomorrow.', '/logo.png', 'Jainarkodi\nDist:- Belgavi\nTq:- Mudalgi', '97410 32052', 'contact@jainarkodi.edu.in', 'Mr. B N Pujeri sir', 'K H P S Jainarkodi is dedicated to providing holistic primary education, fostering critical thinking, moral values, and academic excellence for children from LKG to 7th Standard in a warm, nurturing community environment.', 'Monday – Friday: 9:00 AM – 4:45 PM | Saturday: 8:00 AM – 12:00 PM', 'https://maps.app.goo.gl/CcYsDyy1ZH3STTzs7');
     `);
   } else {
     try { await db.run("UPDATE school_information SET logo_url = '/logo.png' WHERE id = 1;"); } catch (e) {}

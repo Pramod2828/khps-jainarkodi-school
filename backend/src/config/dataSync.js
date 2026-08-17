@@ -71,14 +71,13 @@ async function restoreSnapshot(db) {
       if (!Array.isArray(rows) || rows.length === 0) continue;
 
       try {
-        await db.run(`DELETE FROM ${table};`);
-
+        // Safely insert snapshot rows if missing WITHOUT deleting any existing data
         const sampleRow = rows[0];
         const cols = Object.keys(sampleRow);
         const colNames = cols.join(', ');
         const placeholders = cols.map(() => '?').join(', ');
 
-        const stmt = await db.prepare(`INSERT OR REPLACE INTO ${table} (${colNames}) VALUES (${placeholders})`);
+        const stmt = await db.prepare(`INSERT OR IGNORE INTO ${table} (${colNames}) VALUES (${placeholders})`);
         for (const row of rows) {
           const values = cols.map((c) => (row[c] === undefined ? null : row[c]));
           await stmt.run(values);

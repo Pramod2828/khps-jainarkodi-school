@@ -128,9 +128,26 @@ const pool = {
         const insertId = isInsert && rows[0] && rows[0].id ? rows[0].id : res.oid;
         return [rows, { insertId, affectedRows: res.rowCount }];
       } catch (err) {
+        if (err.message.includes('relation') || err.message.includes('does not exist') || err.message.includes('column')) {
+          console.log(`🔄 Missing relation/column detected in PostgreSQL (${err.message}). Executing schema auto-repair...`);
+          try {
+            await migratePostgres(activePgPool);
+            const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
+            const res = await activePgPool.query(pgSql, pgParams);
+            const rows = res.rows || [];
+            const isInsert = sql.trim().toUpperCase().startsWith('INSERT');
+            const insertId = isInsert && rows[0] && rows[0].id ? rows[0].id : res.oid;
+            lastDbError = null;
+            return [rows, { insertId, affectedRows: res.rowCount }];
+          } catch(retryErr) {
+            console.error(`⚠️ Cloud PostgreSQL query retry error: ${retryErr.message} (SQL: ${sql})`);
+            lastDbError = retryErr.message;
+            throw retryErr;
+          }
+        }
         console.error(`⚠️ Cloud PostgreSQL query error: ${err.message} (SQL: ${sql})`);
         lastDbError = err.message;
-        throw err; // Strict mode: throw error, never silently fall back to SQLite when PostgreSQL is configured
+        throw err;
       }
     }
 

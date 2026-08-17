@@ -70,7 +70,7 @@ function convertSqlForPg(sql, params = []) {
 // Universal database pool interface (Cloud PostgreSQL + MySQL + Automatic SQLite Fallback)
 const pool = {
   query: async (sql, params = []) => {
-    if (dbDriver === 'postgres' && pgPool) {
+    if (dbDriver === 'postgres' && pgPool && !useSqlite) {
       try {
         const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
         const res = await pgPool.query(pgSql, pgParams);
@@ -80,8 +80,9 @@ const pool = {
         return [rows, { insertId, affectedRows: res.rowCount }];
       } catch (err) {
         console.error(`⚠️ Cloud PostgreSQL query error: ${err.message} (SQL: ${sql})`);
-        if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) {
-          throw err; // Fail fast in production so PostgreSQL remains source of truth
+        lastDbError = err.message;
+        if (process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.NODE_ENV === 'production') {
+          throw err; // Strict mode: throw PostgreSQL error, never silently revert to SQLite
         }
         useSqlite = true;
         await getSqliteDb();

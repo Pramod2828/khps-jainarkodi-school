@@ -96,6 +96,11 @@ function convertSqlForPg(sql, params = []) {
     .replace(/DATE\('now',\s*['"]-?(\d+)\s*day['"]\)/gi, "CURRENT_DATE - INTERVAL '$1 day'")
     .replace(/DATE\('now'\)/gi, 'CURRENT_DATE');
 
+  const trimmed = pgSql.trim();
+  if (trimmed.toUpperCase().startsWith('INSERT') && !/RETURNING/i.test(trimmed)) {
+    pgSql = trimmed + ' RETURNING id';
+  }
+
   pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
 
   const pgParams = params.map(p => {
@@ -191,7 +196,10 @@ const pool = {
         query: async (sql, params) => {
           const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
           const res = await client.query(pgSql, pgParams);
-          return [res.rows || []];
+          const rows = res.rows || [];
+          const isInsert = sql.trim().toUpperCase().startsWith('INSERT');
+          const insertId = isInsert && rows[0] && rows[0].id ? rows[0].id : res.oid;
+          return [rows, { insertId, affectedRows: res.rowCount }];
         },
         beginTransaction: async () => client.query('BEGIN'),
         commit: async () => client.query('COMMIT'),

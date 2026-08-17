@@ -4,18 +4,12 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 const { migratePostgres } = require('./migratePostgres');
 
-let PgPool = null;
-try {
-  PgPool = require('pg').Pool;
-} catch (e) {}
-
 let useSqlite = false;
 let dbDriver = 'mysql'; // 'postgres', 'mysql', or 'sqlite'
 let pgPool = null;
 let mysqlPool = null;
 let sqliteDb = null;
 let lastDbError = null;
-let migrationPromise = null;
 
 // Dynamic getter for PostgreSQL URL
 function getPgUrl() {
@@ -117,10 +111,15 @@ function convertSqlForPg(sql, params = []) {
 // Universal database pool interface (Cloud PostgreSQL + MySQL + Automatic SQLite Fallback)
 const pool = {
   query: async (sql, params = []) => {
-    const activePgPool = getPgPool();
-
+    const url = getPgUrl();
+    
     // 1. Strict PostgreSQL Execution Mode if DATABASE_URL/POSTGRES_URL is configured
-    if (activePgPool) {
+    if (url) {
+      const activePgPool = getPgPool();
+      if (!activePgPool) {
+        throw new Error('Cloud PostgreSQL connection pool unavailable: ' + (lastDbError || 'Init error'));
+      }
+
       await ensurePostgresMigrated();
       try {
         const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
@@ -174,8 +173,12 @@ const pool = {
   },
 
   getConnection: async () => {
-    const activePgPool = getPgPool();
-    if (activePgPool) {
+    const url = getPgUrl();
+    if (url) {
+      const activePgPool = getPgPool();
+      if (!activePgPool) {
+        throw new Error('Cloud PostgreSQL connection pool unavailable');
+      }
       await ensurePostgresMigrated();
       const client = await activePgPool.connect();
       return {
@@ -264,18 +267,25 @@ async function executeSqliteQuery(sql, params = []) {
 
 // Test connection helper
 async function testConnection() {
-  const activePgPool = getPgPool();
-  if (activePgPool) {
-    await ensurePostgresMigrated();
-    try {
-      const client = await activePgPool.connect();
-      console.log('✅ Cloud PostgreSQL Database connected successfully.');
-      client.release();
-      lastDbError = null;
-      return true;
-    } catch (err) {
-      console.error('⚠️ Cloud PostgreSQL connection error:', err.message);
-      lastDbError = err.message;
+  const url = getPgUrl();
+  if (url) {
+    const activePgPool = getPgPool();
+    if (activePgPool) {
+      await ensurePostgresMigrated();
+      try {
+        const client = await activePgPool.connect();
+        console.log('✅ Cloud PostgreSQL Database connected successfully.');
+        client.release();
+        lastDbError = null;
+        return true;
+      } catch (err) {
+        console.error('⚠️ Cloud PostgreSQL connection error:', err.message);
+        lastDbError = 'PostgreSQL Connection Error: ' + err.message;
+        return false;
+      }
+    } else {
+      console.error('⚠️ Failed to initialize PostgreSQL pool.');
+      lastDbError = 'PostgreSQL Pool Initialization Error';
       return false;
     }
   }
@@ -301,8 +311,8 @@ async function testConnection() {
 }
 
 function getDbDriverInfo() {
-  const activePgPool = getPgPool();
-  if (activePgPool) return 'POSTGRESQL';
+  const url = getPgUrl();
+  if (url) return 'POSTGRESQL';
   if (useSqlite || process.env.DB_TYPE === 'sqlite') return 'SQLITE_EMBEDDED';
   if (mysqlPool) return 'MYSQL';
   return 'SQLITE_EMBEDDED';

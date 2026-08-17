@@ -15,19 +15,29 @@ let dbDriver = 'mysql'; // 'postgres', 'mysql', or 'sqlite'
 let pgPool = null;
 let mysqlPool = null;
 
+let lastDbError = null;
+
 // Initialize PostgreSQL pool if DATABASE_URL or POSTGRES_URL is set
 const pgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-if (pgUrl && PgPool) {
-  try {
-    dbDriver = 'postgres';
-    pgPool = new PgPool({
-      connectionString: pgUrl,
-      ssl: { rejectUnauthorized: false }
-    });
-    console.log('🔌 Cloud PostgreSQL configuration detected.');
-    migratePostgres(pgUrl).catch(e => console.error('Migration notice:', e.message));
-  } catch (err) {
-    console.warn('⚠️ Failed to initialize PostgreSQL pool:', err.message);
+if (pgUrl) {
+  if (!PgPool) {
+    lastDbError = 'pg module not found in Node.js runtime';
+  } else {
+    try {
+      dbDriver = 'postgres';
+      pgPool = new PgPool({
+        connectionString: pgUrl,
+        ssl: { rejectUnauthorized: false }
+      });
+      console.log('🔌 Cloud PostgreSQL configuration detected.');
+      migratePostgres(pgUrl).catch(e => {
+        console.error('Migration notice:', e.message);
+        lastDbError = 'Migration notice: ' + e.message;
+      });
+    } catch (err) {
+      console.warn('⚠️ Failed to initialize PostgreSQL pool:', err.message);
+      lastDbError = 'PgPool init error: ' + err.message;
+    }
   }
 }
 

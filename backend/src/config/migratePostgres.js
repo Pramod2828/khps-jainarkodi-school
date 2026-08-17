@@ -299,7 +299,9 @@ async function migratePostgres(pool) {
 
       // downloadable_files & downloads
       `ALTER TABLE downloadable_files ADD COLUMN IF NOT EXISTS class_id INT`,
+      `ALTER TABLE downloadable_files ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Worksheets'`,
       `ALTER TABLE downloads ADD COLUMN IF NOT EXISTS class_id INT`,
+      `ALTER TABLE downloads ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Worksheets'`,
 
       // homework
       `ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_teacher_name VARCHAR(100)`,

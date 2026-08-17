@@ -75,18 +75,19 @@ app.get('/api/health', async (req, res) => {
   const dbConnected = await testConnection();
   const driver = getDbDriverInfo();
   const dbError = getDbError();
-  const rawUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  const rawUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_URL || process.env.PG_URL || process.env.DATABASE_PRIVATE_URL || process.env.INTERNAL_DATABASE_URL || '';
   const urlScheme = rawUrl ? (rawUrl.includes('://') ? rawUrl.split('://')[0] : rawUrl.substring(0, 10)) : 'NONE';
+  const envDbKeys = Object.keys(process.env).filter(k => k.includes('DB') || k.includes('URL') || k.includes('POSTGRES') || k.includes('SQL'));
   return res.json({
     status: 'online',
     system: 'Government Primary School Jainarkodi REST API',
     timezone: process.env.TIMEZONE || 'Asia/Kolkata',
     database: dbConnected ? 'connected' : 'disconnected',
     db_driver: driver,
-    is_database_url_configured: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
-    database_url_len: process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 0,
-    postgres_url_len: process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0,
+    is_database_url_configured: Boolean(rawUrl),
+    database_url_len: rawUrl ? rawUrl.length : 0,
     db_url_scheme: urlScheme,
+    env_db_keys: envDbKeys,
     db_error: dbError || null,
     timestamp: new Date().toISOString()
   });

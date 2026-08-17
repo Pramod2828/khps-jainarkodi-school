@@ -19,7 +19,13 @@ let migrationPromise = null;
 
 // Dynamic getter for PostgreSQL URL
 function getPgUrl() {
-  const rawPgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  const rawPgUrl = process.env.DATABASE_URL || 
+                   process.env.POSTGRES_URL || 
+                   process.env.SUPABASE_URL || 
+                   process.env.PG_URL || 
+                   process.env.DATABASE_PRIVATE_URL || 
+                   process.env.INTERNAL_DATABASE_URL || 
+                   '';
   return rawPgUrl.trim().replace(/^['"]|['"]$/g, '');
 }
 

@@ -33,10 +33,11 @@ function getPgUrl() {
 function getPgPool() {
   const url = getPgUrl();
   if (!url) return null;
-  if (!pgPool && PgPool) {
+  if (!pgPool) {
     try {
+      const { Pool } = require('pg');
       dbDriver = 'postgres';
-      pgPool = new PgPool({
+      pgPool = new Pool({
         connectionString: url,
         ssl: { rejectUnauthorized: false }
       });
@@ -44,6 +45,7 @@ function getPgPool() {
     } catch (err) {
       console.error('⚠️ Failed to initialize PostgreSQL pool:', err.message);
       lastDbError = 'PgPool init error: ' + err.message;
+      return null;
     }
   }
   return pgPool;

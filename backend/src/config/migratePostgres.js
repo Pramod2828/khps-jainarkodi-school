@@ -1,13 +1,19 @@
 const fs = require('fs');
 const path = require('path');
 
+let lastMigrationError = null;
+
+function getMigrationError() {
+  return lastMigrationError;
+}
+
 async function migratePostgres(pool) {
   if (!pool) return;
 
   try {
     console.log('🔄 Checking Cloud PostgreSQL schema and non-destructive data sync...');
 
-    // 1. Create all 18 production tables individually using active pool
+    // 1. Create all 18 production tables individually (no trailing semicolons)
     const createTableQueries = [
       `CREATE TABLE IF NOT EXISTS school_information (
         id SERIAL PRIMARY KEY,
@@ -23,13 +29,13 @@ async function migratePostgres(pool) {
         hero_image TEXT,
         map_url TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS roles (
         id SERIAL PRIMARY KEY,
         role_name VARCHAR(50) UNIQUE NOT NULL,
         description TEXT
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -44,25 +50,25 @@ async function migratePostgres(pool) {
         last_login_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS classes (
         id SERIAL PRIMARY KEY,
         class_name VARCHAR(50) UNIQUE NOT NULL,
         display_order INT DEFAULT 0
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS sections (
         id SERIAL PRIMARY KEY,
         class_id INT NOT NULL,
         section_name VARCHAR(10) NOT NULL
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS subjects (
         id SERIAL PRIMARY KEY,
         subject_name VARCHAR(100) NOT NULL,
         subject_code VARCHAR(50)
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS students (
         id SERIAL PRIMARY KEY,
@@ -78,7 +84,7 @@ async function migratePostgres(pool) {
         is_active INT DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS teachers (
         id SERIAL PRIMARY KEY,
@@ -93,7 +99,7 @@ async function migratePostgres(pool) {
         photo_url TEXT,
         is_active INT DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS homework (
         id SERIAL PRIMARY KEY,
@@ -112,7 +118,7 @@ async function migratePostgres(pool) {
         attachment_url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS homework_attachments (
         id SERIAL PRIMARY KEY,
@@ -122,7 +128,7 @@ async function migratePostgres(pool) {
         file_type VARCHAR(100) NOT NULL,
         file_size INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS notices (
         id SERIAL PRIMARY KEY,
@@ -137,7 +143,7 @@ async function migratePostgres(pool) {
         created_by INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS announcements (
         id SERIAL PRIMARY KEY,
@@ -147,7 +153,7 @@ async function migratePostgres(pool) {
         created_by INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS activities (
         id SERIAL PRIMARY KEY,
@@ -159,7 +165,7 @@ async function migratePostgres(pool) {
         created_by INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS activity_images (
         id SERIAL PRIMARY KEY,
@@ -167,14 +173,14 @@ async function migratePostgres(pool) {
         image_url TEXT NOT NULL,
         caption TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS gallery_categories (
         id SERIAL PRIMARY KEY,
         category_name VARCHAR(50) UNIQUE NOT NULL,
         description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS gallery (
         id SERIAL PRIMARY KEY,
@@ -184,7 +190,7 @@ async function migratePostgres(pool) {
         image_url TEXT NOT NULL,
         uploaded_by INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS calendar_events (
         id SERIAL PRIMARY KEY,
@@ -196,7 +202,7 @@ async function migratePostgres(pool) {
         is_holiday INT DEFAULT 0,
         created_by INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS downloadable_files (
         id SERIAL PRIMARY KEY,
@@ -210,7 +216,7 @@ async function migratePostgres(pool) {
         download_count INT DEFAULT 0,
         uploaded_by INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS password_resets (
         id SERIAL PRIMARY KEY,
@@ -219,7 +225,7 @@ async function migratePostgres(pool) {
         otp_code VARCHAR(10) NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`,
+      )`,
 
       `CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
@@ -231,7 +237,7 @@ async function migratePostgres(pool) {
         ip_address VARCHAR(50),
         details TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );`
+      )`
     ];
 
     for (const q of createTableQueries) {
@@ -239,38 +245,39 @@ async function migratePostgres(pool) {
         await pool.query(q);
       } catch (tableErr) {
         console.error(`Table Query Warning: ${tableErr.message} (Query: ${q.substring(0, 50)})`);
+        lastMigrationError = `Create Table Error: ${tableErr.message}`;
       }
     }
 
     // 2. Non-destructive ALTER TABLE ADD COLUMN IF NOT EXISTS
     const alterTableQueries = [
-      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS description TEXT;`,
-      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'NORMAL';`,
-      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS notice_time VARCHAR(20);`,
-      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS expiry_date DATE;`,
-      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS is_archived INT DEFAULT 0;`,
-      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS attachment_url TEXT;`,
+      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS description TEXT`,
+      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'NORMAL'`,
+      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS notice_time VARCHAR(20)`,
+      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS expiry_date DATE`,
+      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS is_archived INT DEFAULT 0`,
+      `ALTER TABLE notices ADD COLUMN IF NOT EXISTS attachment_url TEXT`,
 
-      `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS content TEXT;`,
-      `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS is_banner INT DEFAULT 0;`,
-      `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS created_by INT;`,
+      `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS content TEXT`,
+      `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS is_banner INT DEFAULT 0`,
+      `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS created_by INT`,
 
-      `ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_teacher_name VARCHAR(100);`,
-      `ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_subject_name VARCHAR(100);`,
-      `ALTER TABLE homework ADD COLUMN IF NOT EXISTS attachment_url TEXT;`,
+      `ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_teacher_name VARCHAR(100)`,
+      `ALTER TABLE homework ADD COLUMN IF NOT EXISTS custom_subject_name VARCHAR(100)`,
+      `ALTER TABLE homework ADD COLUMN IF NOT EXISTS attachment_url TEXT`,
 
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password VARCHAR(255);`,
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password VARCHAR(255)`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`,
 
-      `ALTER TABLE students ADD COLUMN IF NOT EXISTS photo_url TEXT;`,
-      `ALTER TABLE students ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE';`,
+      `ALTER TABLE students ADD COLUMN IF NOT EXISTS photo_url TEXT`,
+      `ALTER TABLE students ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE'`,
 
-      `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS description TEXT;`,
-      `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS category_id INT;`,
-      `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS uploaded_by INT;`,
+      `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS description TEXT`,
+      `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS category_id INT`,
+      `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS uploaded_by INT`,
 
-      `ALTER TABLE activities ADD COLUMN IF NOT EXISTS cover_image TEXT;`,
-      `ALTER TABLE activities ADD COLUMN IF NOT EXISTS video_url TEXT;`
+      `ALTER TABLE activities ADD COLUMN IF NOT EXISTS cover_image TEXT`,
+      `ALTER TABLE activities ADD COLUMN IF NOT EXISTS video_url TEXT`
     ];
 
     for (const alterQ of alterTableQueries) {
@@ -281,10 +288,10 @@ async function migratePostgres(pool) {
 
     // 3. Non-destructive core table seeds
     const seedQueries = [
-      `INSERT INTO roles (id, role_name, description) VALUES (1, 'SUPER_ADMIN', 'Full access to manage school system'), (2, 'TEACHER', 'Access to manage homework, activities, and students') ON CONFLICT DO NOTHING;`,
-      `INSERT INTO classes (id, class_name, display_order) VALUES (1, '1st Standard', 1), (2, '2nd Standard', 2), (3, '3rd Standard', 3), (4, '4th Standard', 4), (5, '5th Standard', 5) ON CONFLICT DO NOTHING;`,
-      `INSERT INTO sections (id, class_id, section_name) VALUES (1, 1, 'A'), (2, 2, 'A'), (3, 3, 'A'), (4, 4, 'A'), (5, 5, 'A') ON CONFLICT DO NOTHING;`,
-      `INSERT INTO subjects (id, subject_name, subject_code) VALUES (1, 'Kannada', 'KAN'), (2, 'English', 'ENG'), (3, 'Mathematics', 'MATH'), (4, 'Science', 'SCI'), (5, 'Social Science', 'SS') ON CONFLICT DO NOTHING;`
+      `INSERT INTO roles (id, role_name, description) VALUES (1, 'SUPER_ADMIN', 'Full access to manage school system'), (2, 'TEACHER', 'Access to manage homework, activities, and students') ON CONFLICT DO NOTHING`,
+      `INSERT INTO classes (id, class_name, display_order) VALUES (1, '1st Standard', 1), (2, '2nd Standard', 2), (3, '3rd Standard', 3), (4, '4th Standard', 4), (5, '5th Standard', 5) ON CONFLICT DO NOTHING`,
+      `INSERT INTO sections (id, class_id, section_name) VALUES (1, 1, 'A'), (2, 2, 'A'), (3, 3, 'A'), (4, 4, 'A'), (5, 5, 'A') ON CONFLICT DO NOTHING`,
+      `INSERT INTO subjects (id, subject_name, subject_code) VALUES (1, 'Kannada', 'KAN'), (2, 'English', 'ENG'), (3, 'Mathematics', 'MATH'), (4, 'Science', 'SCI'), (5, 'Social Science', 'SS') ON CONFLICT DO NOTHING`
     ];
 
     for (const sq of seedQueries) {
@@ -329,7 +336,8 @@ async function migratePostgres(pool) {
     console.log('✅ PostgreSQL Schema & Data Sync verified 100% cleanly!');
   } catch (err) {
     console.error('⚠️ PostgreSQL Migration Notice:', err.message);
+    lastMigrationError = err.message;
   }
 }
 
-module.exports = { migratePostgres };
+module.exports = { migratePostgres, getMigrationError };

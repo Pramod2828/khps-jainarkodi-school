@@ -166,7 +166,7 @@ async function createHomework(req, res) {
     }
 
     // Insert homework with explicit RETURNING id for PostgreSQL
-    const [result] = await connection.query(
+    const [rows, meta] = await connection.query(
       `INSERT INTO homework (class_id, section_id, subject_id, custom_subject_name, title, description, homework_date, homework_day, homework_time, due_date, teacher_id, custom_teacher_name, attachment_url)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING id`,
@@ -187,13 +187,17 @@ async function createHomework(req, res) {
       ]
     );
 
-    const homeworkId = (result && result.insertId) || (Array.isArray(result) && result[0] ? result[0].id : null) || (result && result.id);
+    let homeworkId = null;
+    if (meta && meta.insertId) homeworkId = meta.insertId;
+    else if (rows && rows.insertId) homeworkId = rows.insertId;
+    else if (Array.isArray(rows) && rows[0] && rows[0].id) homeworkId = rows[0].id;
+    else if (rows && rows.id) homeworkId = rows.id;
 
     if (req.file && homeworkId) {
       await connection.query(
         `INSERT INTO homework_attachments (homework_id, file_path, file_name, file_type, file_size)
          VALUES (?, ?, ?, ?, ?)`,
-        [homeworkId, attachmentUrl, req.file.originalname, req.file.mimetype, req.file.size]
+        [parseInt(homeworkId), attachmentUrl, req.file.originalname, req.file.mimetype, req.file.size]
       );
     }
 
@@ -254,7 +258,7 @@ async function updateHomework(req, res) {
       await connection.query(
         `INSERT INTO homework_attachments (homework_id, file_path, file_name, file_type, file_size)
          VALUES (?, ?, ?, ?, ?)`,
-        [id, attachmentUrl, req.file.originalname, req.file.mimetype, req.file.size]
+        [parseInt(id), attachmentUrl, req.file.originalname, req.file.mimetype, req.file.size]
       );
     }
 
@@ -288,7 +292,7 @@ async function updateHomework(req, res) {
         teacher_id ? parseInt(teacher_id) : null,
         custom_teacher_name ? custom_teacher_name.trim() : null,
         attachmentUrl,
-        id
+        parseInt(id)
       ]
     );
 

@@ -71,7 +71,9 @@ async function uploadGalleryPhoto(req, res) {
   try {
     const { title, description, category_id } = req.body;
 
-    if (!req.file) {
+    const file = req.file || (req.files && (req.files.photo?.[0] || req.files.image?.[0]));
+
+    if (!file) {
       return errorResponse(res, 'An image file is required for gallery upload.', 400, 'VALIDATION_ERROR');
     }
 
@@ -80,12 +82,12 @@ async function uploadGalleryPhoto(req, res) {
     }
 
     // Check size limit: 5MB for images
-    if (req.file.size > 5 * 1024 * 1024) {
-      fs.unlinkSync(req.file.path);
+    if (file.size > 5 * 1024 * 1024) {
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       return errorResponse(res, 'Image file size must not exceed 5 MB.', 400, 'FILE_TOO_LARGE');
     }
 
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const imageUrl = `/uploads/${file.filename}`;
 
     const [result] = await pool.query(
       `INSERT INTO gallery (title, description, category_id, image_url, uploaded_by)

@@ -8,7 +8,16 @@ const upload = require('../middleware/upload');
 router.get('/categories', galleryController.getCategories);
 router.get('/', galleryController.getGallery);
 
-router.post('/', verifyToken, requireTeacherOrAdmin, upload.single('image'), galleryController.uploadGalleryPhoto);
+router.post(
+  '/', 
+  verifyToken, 
+  requireTeacherOrAdmin, 
+  upload.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'image', maxCount: 1 }
+  ]), 
+  galleryController.uploadGalleryPhoto
+);
 router.delete('/:id', verifyToken, requireTeacherOrAdmin, galleryController.deleteGalleryPhoto);
 
 module.exports = router;

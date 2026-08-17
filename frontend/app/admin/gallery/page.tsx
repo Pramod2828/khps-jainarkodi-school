@@ -76,8 +76,8 @@ export default function AdminGalleryPage() {
       setTitle('');
       setFile(null);
       loadPhotos();
-    } catch (err) {
-      alert('Failed to upload photo');
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Failed to upload photo');
     } finally {
       setSaving(false);
     }

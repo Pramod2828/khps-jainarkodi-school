@@ -27,7 +27,7 @@ async function login(req, res) {
     `, [loginInput, loginInput, loginInput, loginInput]);
 
     if (rows.length === 0) {
-      await logAudit({ action: 'FAILED_LOGIN', module: 'AUTH', details: `Attempted email: ${email}`, ipAddress: req.ip });
+      logAudit({ action: 'FAILED_LOGIN', module: 'AUTH', details: `Attempted email: ${email}`, ipAddress: req.ip }).catch(() => {});
       return errorResponse(res, 'Invalid email or password.', 401, 'INVALID_CREDENTIALS');
     }
 
@@ -39,12 +39,9 @@ async function login(req, res) {
 
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
-      await logAudit({ userId: user.id, userName: user.name, action: 'FAILED_LOGIN', module: 'AUTH', ipAddress: req.ip });
+      logAudit({ userId: user.id, userName: user.name, action: 'FAILED_LOGIN', module: 'AUTH', ipAddress: req.ip }).catch(() => {});
       return errorResponse(res, 'Invalid email or password.', 401, 'INVALID_CREDENTIALS');
     }
-
-    // Update last login timestamp
-    await pool.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
 
     // Sign JWT token
     const tokenPayload = {
@@ -70,14 +67,16 @@ async function login(req, res) {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
-    await logAudit({
+    // Async non-blocking update last login & audit log
+    pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]).catch(() => {});
+    logAudit({
       userId: user.id,
       userName: user.name,
       action: 'LOGIN',
       module: 'AUTH',
       ipAddress: req.ip,
       details: `User logged in with role ${user.role}`
-    });
+    }).catch(() => {});
 
     return successResponse(res, {
       token,

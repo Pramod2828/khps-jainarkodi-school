@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GraduationCap, Lock, Mail, AlertCircle, ArrowRight, ShieldCheck, UserCheck, CheckCircle2, Eye, EyeOff } from 'lucide-react';
@@ -14,6 +14,11 @@ export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState<'SUPER_ADMIN' | 'TEACHER' | 'CUSTOM'>('TEACHER');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    // Ping health check in background on page load to wake up server from cold sleep instantly
+    api.get('/health').catch(() => {});
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

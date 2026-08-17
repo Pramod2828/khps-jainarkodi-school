@@ -15,6 +15,7 @@ let pgPool = null;
 let mysqlPool = null;
 let sqliteDb = null;
 let lastDbError = null;
+let migrationPromise = null;
 
 // Dynamic getter for PostgreSQL URL
 function getPgUrl() {
@@ -33,17 +34,27 @@ function getPgPool() {
         connectionString: url,
         ssl: { rejectUnauthorized: false }
       });
-      console.log('🔌 Cloud PostgreSQL configuration detected. Running automatic schema & data sync...');
-      migratePostgres(url).catch(e => {
-        console.error('Migration notice:', e.message);
-        lastDbError = 'Migration notice: ' + e.message;
-      });
+      console.log('🔌 Cloud PostgreSQL configuration detected.');
     } catch (err) {
       console.error('⚠️ Failed to initialize PostgreSQL pool:', err.message);
       lastDbError = 'PgPool init error: ' + err.message;
     }
   }
   return pgPool;
+}
+
+// Ensure schema migration finishes before queries execute
+async function ensurePostgresMigrated() {
+  const url = getPgUrl();
+  if (!url) return;
+  if (!migrationPromise) {
+    console.log('🔄 Executing Cloud PostgreSQL non-destructive schema migration...');
+    migrationPromise = migratePostgres(url).catch(e => {
+      console.error('Migration notice:', e.message);
+      lastDbError = 'Migration notice: ' + e.message;
+    });
+  }
+  await migrationPromise;
 }
 
 // Lazy getter for MySQL pool (Local Dev fallback)
@@ -93,6 +104,7 @@ const pool = {
 
     // 1. Strict PostgreSQL Execution Mode if DATABASE_URL/POSTGRES_URL is configured
     if (activePgPool) {
+      await ensurePostgresMigrated();
       try {
         const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
         const res = await activePgPool.query(pgSql, pgParams);
@@ -130,6 +142,7 @@ const pool = {
   getConnection: async () => {
     const activePgPool = getPgPool();
     if (activePgPool) {
+      await ensurePostgresMigrated();
       const client = await activePgPool.connect();
       return {
         query: async (sql, params) => {
@@ -219,6 +232,7 @@ async function executeSqliteQuery(sql, params = []) {
 async function testConnection() {
   const activePgPool = getPgPool();
   if (activePgPool) {
+    await ensurePostgresMigrated();
     try {
       const client = await activePgPool.connect();
       console.log('✅ Cloud PostgreSQL Database connected successfully.');

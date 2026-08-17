@@ -149,7 +149,7 @@ async function createStudent(req, res) {
 async function updateStudent(req, res) {
   try {
     const { id } = req.params;
-    const { full_name, class_id, section_id, parent_name, parent_phone, address, status } = req.body;
+    const { student_code, full_name, class_id, section_id, parent_name, parent_phone, address, status } = req.body;
 
     const [existing] = await pool.query('SELECT * FROM students WHERE id = ?', [id]);
     if (existing.length === 0) {
@@ -163,6 +163,7 @@ async function updateStudent(req, res) {
 
     await pool.query(
       `UPDATE students SET
+        student_code = COALESCE(?, student_code),
         full_name = COALESCE(?, full_name),
         class_id = COALESCE(?, class_id),
         section_id = COALESCE(?, section_id),
@@ -173,6 +174,7 @@ async function updateStudent(req, res) {
         status = COALESCE(?, status)
        WHERE id = ?`,
       [
+        student_code ? student_code.trim() : null,
         full_name ? full_name.trim() : null,
         class_id ? parseInt(class_id) : null,
         section_id ? parseInt(section_id) : null,

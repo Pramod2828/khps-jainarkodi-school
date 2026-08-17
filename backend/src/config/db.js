@@ -1,8 +1,7 @@
-const mysql = require('mysql2/promise');
+const sqlite3 = require('sqlite3');
+const { open } = require('sqlite-async');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
-const { executeSqliteQuery, getSqliteDb } = require('./sqliteDb');
-
+const mysql = require('mysql2/promise');
 const { migratePostgres } = require('./migratePostgres');
 
 let PgPool = null;
@@ -14,14 +13,17 @@ let useSqlite = false;
 let dbDriver = 'mysql'; // 'postgres', 'mysql', or 'sqlite'
 let pgPool = null;
 let mysqlPool = null;
-
+let sqliteDb = null;
 let lastDbError = null;
 
 // Initialize PostgreSQL pool if DATABASE_URL or POSTGRES_URL is set
-const pgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+const rawPgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+const pgUrl = rawPgUrl.trim().replace(/^['"]|['"]$/g, '');
+
 if (pgUrl) {
   if (!PgPool) {
     lastDbError = 'pg module not found in Node.js runtime';
+    console.error('❌ ' + lastDbError);
   } else {
     try {
       dbDriver = 'postgres';
@@ -29,19 +31,17 @@ if (pgUrl) {
         connectionString: pgUrl,
         ssl: { rejectUnauthorized: false }
       });
-      console.log('🔌 Cloud PostgreSQL configuration detected.');
+      console.log('🔌 Cloud PostgreSQL configuration detected. Running automatic schema & data sync...');
       migratePostgres(pgUrl).catch(e => {
         console.error('Migration notice:', e.message);
         lastDbError = 'Migration notice: ' + e.message;
       });
     } catch (err) {
-      console.warn('⚠️ Failed to initialize PostgreSQL pool:', err.message);
+      console.error('⚠️ Failed to initialize PostgreSQL pool:', err.message);
       lastDbError = 'PgPool init error: ' + err.message;
     }
   }
-}
-
-if (!pgPool) {
+} else {
   mysqlPool = mysql.createPool({
     host: process.env.DB_HOST || '127.0.0.1',
     port: parseInt(process.env.DB_PORT || '3306'),
@@ -80,7 +80,8 @@ function convertSqlForPg(sql, params = []) {
 // Universal database pool interface (Cloud PostgreSQL + MySQL + Automatic SQLite Fallback)
 const pool = {
   query: async (sql, params = []) => {
-    if (dbDriver === 'postgres' && pgPool && !useSqlite) {
+    // 1. Strict PostgreSQL Execution Mode if pgUrl is present
+    if (pgUrl && pgPool) {
       try {
         const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
         const res = await pgPool.query(pgSql, pgParams);
@@ -91,19 +92,16 @@ const pool = {
       } catch (err) {
         console.error(`⚠️ Cloud PostgreSQL query error: ${err.message} (SQL: ${sql})`);
         lastDbError = err.message;
-        if (process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.NODE_ENV === 'production') {
-          throw err; // Strict mode: throw PostgreSQL error, never silently revert to SQLite
-        }
-        useSqlite = true;
-        await getSqliteDb();
-        return await executeSqliteQuery(sql, params);
+        throw err; // Strict mode: throw error, never silently fall back to SQLite when pgUrl is present
       }
     }
 
+    // 2. Embedded SQLite Execution Mode
     if (useSqlite || process.env.DB_TYPE === 'sqlite') {
       return await executeSqliteQuery(sql, params);
     }
 
+    // 3. MySQL Execution Mode (Local Dev fallback)
     try {
       return await mysqlPool.query(sql, params);
     } catch (err) {
@@ -116,7 +114,23 @@ const pool = {
       throw err;
     }
   },
+
   getConnection: async () => {
+    if (pgUrl && pgPool) {
+      const client = await pgPool.connect();
+      return {
+        query: async (sql, params) => {
+          const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
+          const res = await client.query(pgSql, pgParams);
+          return [res.rows || []];
+        },
+        beginTransaction: async () => client.query('BEGIN'),
+        commit: async () => client.query('COMMIT'),
+        rollback: async () => client.query('ROLLBACK'),
+        release: () => client.release()
+      };
+    }
+
     if (useSqlite || process.env.DB_TYPE === 'sqlite') {
       const sqliteDb = await getSqliteDb();
       return {
@@ -132,39 +146,6 @@ const pool = {
         },
         release: () => {}
       };
-    }
-
-    if (dbDriver === 'postgres' && pgPool) {
-      try {
-        const client = await pgPool.connect();
-        return {
-          query: async (sql, params) => {
-            const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
-            const res = await client.query(pgSql, pgParams);
-            return [res.rows || []];
-          },
-          beginTransaction: async () => client.query('BEGIN'),
-          commit: async () => client.query('COMMIT'),
-          rollback: async () => client.query('ROLLBACK'),
-          release: () => client.release()
-        };
-      } catch (err) {
-        useSqlite = true;
-        const sqliteDb = await getSqliteDb();
-        return {
-          query: async (sql, params) => executeSqliteQuery(sql, params),
-          beginTransaction: async () => {
-            try { await sqliteDb.exec('BEGIN TRANSACTION;'); } catch(e){}
-          },
-          commit: async () => {
-            try { await sqliteDb.exec('COMMIT;'); } catch(e){}
-          },
-          rollback: async () => {
-            try { await sqliteDb.exec('ROLLBACK;'); } catch(e){}
-          },
-          release: () => {}
-        };
-      }
     }
 
     try {
@@ -189,15 +170,40 @@ const pool = {
   }
 };
 
+// SQLite Initialization & Helper
+async function getSqliteDb() {
+  if (!sqliteDb) {
+    const { initSqliteDb } = require('./sqliteDb');
+    sqliteDb = await initSqliteDb();
+  }
+  return sqliteDb;
+}
+
+async function executeSqliteQuery(sql, params = []) {
+  const db = await getSqliteDb();
+  const trimmed = sql.trim().toUpperCase();
+  
+  if (trimmed.startsWith('SELECT')) {
+    const rows = await db.all(sql, params);
+    return [rows, []];
+  } else if (trimmed.startsWith('INSERT')) {
+    const result = await db.run(sql, params);
+    return [
+      { insertId: result.lastID, affectedRows: result.changes },
+      { insertId: result.lastID, affectedRows: result.changes }
+    ];
+  } else {
+    const result = await db.run(sql, params);
+    return [
+      { affectedRows: result.changes },
+      { affectedRows: result.changes }
+    ];
+  }
+}
+
 // Test connection helper
 async function testConnection() {
-  if (useSqlite || process.env.DB_TYPE === 'sqlite') {
-    await getSqliteDb();
-    console.log('✅ Embedded SQLite Database connected successfully.');
-    return true;
-  }
-
-  if (dbDriver === 'postgres' && pgPool) {
+  if (pgUrl && pgPool) {
     try {
       const client = await pgPool.connect();
       console.log('✅ Cloud PostgreSQL Database connected successfully.');
@@ -205,16 +211,16 @@ async function testConnection() {
       lastDbError = null;
       return true;
     } catch (err) {
-      console.warn('⚠️ Cloud PostgreSQL unavailable:', err.message);
+      console.error('⚠️ Cloud PostgreSQL connection error:', err.message);
       lastDbError = err.message;
-      if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) {
-        // Do not silently switch to SQLite if DATABASE_URL is explicitly set
-      } else {
-        useSqlite = true;
-        await getSqliteDb();
-      }
       return false;
     }
+  }
+
+  if (useSqlite || process.env.DB_TYPE === 'sqlite') {
+    await getSqliteDb();
+    console.log('✅ Embedded SQLite Database connected successfully.');
+    return true;
   }
 
   try {
@@ -230,11 +236,9 @@ async function testConnection() {
   }
 }
 
-let lastDbError = null;
-
 function getDbDriverInfo() {
+  if (pgUrl && pgPool) return 'POSTGRESQL';
   if (useSqlite || process.env.DB_TYPE === 'sqlite') return 'SQLITE_EMBEDDED';
-  if (dbDriver === 'postgres' && pgPool) return 'POSTGRESQL';
   if (mysqlPool) return 'MYSQL';
   return 'SQLITE_EMBEDDED';
 }

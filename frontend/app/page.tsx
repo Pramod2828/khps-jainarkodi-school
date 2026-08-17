@@ -92,8 +92,6 @@ export default function HomePage() {
 
   // Fetch homework when user changes selected class box
   useEffect(() => {
-    if (selectedHwClass === 'all' && latestHomework.length > 0) return;
-
     async function fetchClassHomework() {
       setHwLoading(true);
       try {
@@ -374,9 +372,9 @@ export default function HomePage() {
                       <span>Due Date: {hw.due_date}</span>
                       <span>By: {hw.teacher_name}</span>
                     </div>
-                    {hw.file_path && (
+                    {(hw.attachment_url || hw.file_path) && (
                       <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-bold pt-1">
-                        <Download className="w-3.5 h-3.5" /> Attachment Available ({hw.file_name})
+                        <Download className="w-3.5 h-3.5" /> Attachment Available ({hw.file_name || 'File'})
                       </span>
                     )}
                   </div>
@@ -682,9 +680,9 @@ export default function HomePage() {
                   <UserCheck className="w-3.5 h-3.5 text-blue-600" /> Teacher: <strong>{selectedHwModal.teacher_name}</strong>
                 </span>
 
-                {selectedHwModal.file_path && (
+                {(selectedHwModal.attachment_url || selectedHwModal.file_path) && (
                   <a
-                    href={getAssetUrl(selectedHwModal.file_path)}
+                    href={getAssetUrl(selectedHwModal.attachment_url || selectedHwModal.file_path || '')}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-xs"

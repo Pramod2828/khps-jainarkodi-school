@@ -99,13 +99,9 @@ export default function AdminDownloadsPage() {
       if (file) formData.append('file', file);
 
       if (editingItem) {
-        await api.put(`/downloads/${editingItem.id}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await api.put(`/downloads/${editingItem.id}`, formData);
       } else {
-        await api.post('/downloads', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await api.post('/downloads', formData);
       }
 
       setIsModalOpen(false);
@@ -114,8 +110,9 @@ export default function AdminDownloadsPage() {
       setDescription('');
       setFile(null);
       loadDownloads();
-    } catch (err) {
-      alert('Failed to save material');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error?.details || err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to save material';
+      alert(errMsg);
     } finally {
       setSaving(false);
     }

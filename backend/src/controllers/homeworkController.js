@@ -59,7 +59,7 @@ async function getHomeworkList(req, res) {
               h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name) as subject_name, sub.subject_code,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time, h.due_date,
               h.teacher_id, COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              h.attachment_url, h.created_at
+              h.attachment_url, h.attachment_url as file_path, h.created_at
        FROM homework h
        LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN sections sec ON h.section_id = sec.id

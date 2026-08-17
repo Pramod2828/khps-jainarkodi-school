@@ -112,6 +112,7 @@ export interface GalleryItem {
 export interface Student {
   id: number;
   student_code: string;
+  sat_number?: string;
   full_name: string;
   class_id: number;
   class_name?: string;

@@ -71,8 +71,8 @@ async function createTeacher(req, res) {
 
     return successResponse(res, { id: result.insertId, name, email }, 'Teacher account created successfully', 201);
   } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      return errorResponse(res, 'An account with this email already exists.', 400, 'DUPLICATE_ENTRY');
+    if (error.code === 'ER_DUP_ENTRY' || error.code === '23505' || (error.message && error.message.includes('unique constraint'))) {
+      return errorResponse(res, 'An account with this email/username already exists.', 400, 'DUPLICATE_ENTRY', 'Email/username already exists');
     }
     return errorResponse(res, 'Failed to create teacher account', 500, 'SERVER_ERROR', error.message);
   }

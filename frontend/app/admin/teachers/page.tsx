@@ -81,7 +81,8 @@ export default function AdminTeachersPage() {
       setPhone('');
       loadTeachers();
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to create teacher account');
+      const errMsg = err.response?.data?.error?.details || err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to create teacher account';
+      alert(errMsg);
     } finally {
       setSaving(false);
     }

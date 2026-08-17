@@ -206,7 +206,7 @@ export default function HomeworkPublicPage() {
                     </span>
                   </div>
 
-                  {hw.file_path && (
+                  {(hw.attachment_url || hw.file_path) && (
                     <div className="pt-2">
                       <span className="inline-flex items-center justify-center gap-2 w-full bg-emerald-50 text-emerald-800 text-xs font-bold py-2 rounded-xl border border-emerald-200">
                         <Download className="w-4 h-4" /> Download Attachment ({hw.file_name || 'File'})
@@ -288,9 +288,9 @@ export default function HomeworkPublicPage() {
                   <UserCheck className="w-3.5 h-3.5 text-blue-600" /> Teacher: <strong>{selectedHwModal.teacher_name}</strong>
                 </span>
 
-                {selectedHwModal.file_path && (
+                {(selectedHwModal.attachment_url || selectedHwModal.file_path) && (
                   <a
-                    href={getAssetUrl(selectedHwModal.file_path)}
+                    href={getAssetUrl(selectedHwModal.attachment_url || selectedHwModal.file_path || '')}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-xs"

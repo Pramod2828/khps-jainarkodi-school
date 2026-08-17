@@ -33,10 +33,10 @@ async function getDownloads(req, res) {
 
     const [rows] = await pool.query(
       `SELECT d.id, d.title, d.description, d.class_id, c.class_name, d.category,
-              d.file_url, d.file_size, d.file_type, d.uploaded_by, u.name as uploader_name, d.created_at
+              d.file_url, d.file_size, d.file_type, d.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, d.created_at
        FROM downloads d
        LEFT JOIN classes c ON d.class_id = c.id
-       JOIN users u ON d.uploaded_by = u.id
+       LEFT JOIN users u ON d.uploaded_by = u.id
        WHERE ${whereSql}
        ORDER BY d.created_at DESC`,
       queryParams
@@ -44,6 +44,7 @@ async function getDownloads(req, res) {
 
     return successResponse(res, rows, 'Downloads retrieved');
   } catch (error) {
+    console.error('getDownloads Error:', error);
     return errorResponse(res, 'Failed to fetch download materials', 500, 'SERVER_ERROR', error.message);
   }
 }
@@ -63,12 +64,27 @@ async function createDownload(req, res) {
       return errorResponse(res, 'Title is required', 400, 'VALIDATION_ERROR');
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    let fileUrl = `/uploads/${req.file.filename}`;
     const ext = path.extname(req.file.originalname).replace('.', '').toLowerCase();
 
-    const [result] = await pool.query(
+    // Store as Base64 Data URL for 100% persistent storage across Render container redeploys
+    try {
+      if (fs.existsSync(req.file.path)) {
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const base64Str = fileBuffer.toString('base64');
+        const mimeType = req.file.mimetype || 'application/octet-stream';
+        fileUrl = `data:${mimeType};base64,${base64Str}`;
+      }
+    } catch (e) {
+      console.warn('File buffer conversion warning:', e.message);
+    }
+
+    const uploaderId = req.user ? req.user.id : 1;
+
+    const [result, meta] = await pool.query(
       `INSERT INTO downloads (title, description, class_id, category, file_url, file_size, file_type, uploaded_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id`,
       [
         title.trim(),
         description ? description.trim() : null,
@@ -77,20 +93,44 @@ async function createDownload(req, res) {
         fileUrl,
         req.file.size,
         ext,
-        req.user.id
+        uploaderId
       ]
     );
 
+    let downloadId = null;
+    if (meta && meta.insertId) downloadId = meta.insertId;
+    else if (result && result.insertId) downloadId = result.insertId;
+    else if (Array.isArray(result) && result[0] && result[0].id) downloadId = result[0].id;
+    else if (result && result.id) downloadId = result.id;
+
+    // Sync to downloadable_files table for database backward compatibility
+    try {
+      await pool.query(
+        `INSERT INTO downloadable_files (title, description, class_id, file_path, file_size, file_type, category)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          title.trim(),
+          description ? description.trim() : null,
+          class_id && class_id !== 'all' ? parseInt(class_id) : null,
+          fileUrl,
+          req.file.size,
+          ext,
+          category || 'Worksheets'
+        ]
+      );
+    } catch (syncErr) {}
+
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: uploaderId,
+      userName: req.user ? req.user.name : 'Admin',
       action: 'UPLOAD_DOWNLOAD',
       module: 'DOWNLOADS',
-      recordId: result.insertId
+      recordId: downloadId
     });
 
-    return successResponse(res, { id: result.insertId, file_url: fileUrl }, 'Material uploaded successfully', 201);
+    return successResponse(res, { id: downloadId, file_url: fileUrl }, 'Material uploaded successfully', 201);
   } catch (error) {
+    console.error('createDownload Error:', error);
     return errorResponse(res, 'Failed to upload material', 500, 'SERVER_ERROR', error.message);
   }
 }
@@ -116,6 +156,15 @@ async function updateDownload(req, res) {
       fileUrl = `/uploads/${req.file.filename}`;
       fileSize = req.file.size;
       fileType = path.extname(req.file.originalname).replace('.', '').toLowerCase();
+
+      try {
+        if (fs.existsSync(req.file.path)) {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          const base64Str = fileBuffer.toString('base64');
+          const mimeType = req.file.mimetype || 'application/octet-stream';
+          fileUrl = `data:${mimeType};base64,${base64Str}`;
+        }
+      } catch (e) {}
     }
 
     await pool.query(
@@ -141,8 +190,8 @@ async function updateDownload(req, res) {
     );
 
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Admin',
       action: 'UPDATE_DOWNLOAD',
       module: 'DOWNLOADS',
       recordId: id
@@ -150,6 +199,7 @@ async function updateDownload(req, res) {
 
     return successResponse(res, null, 'Material updated successfully');
   } catch (error) {
+    console.error('updateDownload Error:', error);
     return errorResponse(res, 'Failed to update material', 500, 'SERVER_ERROR', error.message);
   }
 }
@@ -162,7 +212,7 @@ async function deleteDownload(req, res) {
     const { id } = req.params;
 
     const [existing] = await pool.query('SELECT file_url FROM downloads WHERE id = ?', [id]);
-    if (existing.length > 0 && existing[0].file_url) {
+    if (existing.length > 0 && existing[0].file_url && !existing[0].file_url.startsWith('data:')) {
       const fullPath = path.join(__dirname, '../../', existing[0].file_url);
       if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
     }
@@ -171,6 +221,7 @@ async function deleteDownload(req, res) {
 
     return successResponse(res, null, 'Material deleted successfully');
   } catch (error) {
+    console.error('deleteDownload Error:', error);
     return errorResponse(res, 'Failed to delete material', 500, 'SERVER_ERROR', error.message);
   }
 }

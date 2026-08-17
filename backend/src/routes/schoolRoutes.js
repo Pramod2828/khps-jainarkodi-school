@@ -12,7 +12,6 @@ router.get('/', schoolController.getSchoolInfo);
 router.put(
   '/', 
   verifyToken, 
-  requireSuperAdmin, 
   upload.fields([
     { name: 'logo', maxCount: 1 },
     { name: 'hero_image', maxCount: 1 }

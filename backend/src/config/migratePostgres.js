@@ -292,6 +292,7 @@ async function migratePostgres(pool) {
       `ALTER TABLE gallery_categories ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
 
       // students
+      `ALTER TABLE students ADD COLUMN IF NOT EXISTS sat_number VARCHAR(100)`,
       `ALTER TABLE students ADD COLUMN IF NOT EXISTS photo_url TEXT`,
       `ALTER TABLE students ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'ACTIVE'`,
       `ALTER TABLE students ADD COLUMN IF NOT EXISTS is_active INT DEFAULT 1`,

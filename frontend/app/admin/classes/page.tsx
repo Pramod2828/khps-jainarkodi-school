@@ -40,6 +40,7 @@ export default function AdminClassesPage() {
   // Add Student inside Class Modal
   const [showAddStudentForm, setShowAddStudentForm] = useState(false);
   const [studentFullName, setStudentFullName] = useState('');
+  const [satNumber, setSatNumber] = useState('');
   const [studentSectionId, setStudentSectionId] = useState('');
   const [parentName, setParentName] = useState('');
   const [parentPhone, setParentPhone] = useState('');
@@ -92,6 +93,7 @@ export default function AdminClassesPage() {
     setSelectedClassForStudents(c);
     setShowAddStudentForm(false);
     setStudentFullName('');
+    setSatNumber('');
     setParentName('');
     setParentPhone('');
     setStudentAddress('');
@@ -119,6 +121,8 @@ export default function AdminClassesPage() {
     try {
       await api.post('/students', {
         full_name: studentFullName,
+        sat_number: satNumber,
+        student_code: satNumber,
         class_id: selectedClassForStudents.id,
         section_id: studentSectionId ? parseInt(studentSectionId) : null,
         parent_name: parentName,
@@ -126,6 +130,7 @@ export default function AdminClassesPage() {
         address: studentAddress
       });
       setStudentFullName('');
+      setSatNumber('');
       setParentName('');
       setParentPhone('');
       setStudentAddress('');
@@ -133,7 +138,8 @@ export default function AdminClassesPage() {
       fetchStudentsForClass(selectedClassForStudents.id);
       loadClasses();
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to enroll student');
+      const errMsg = err.response?.data?.error?.details || err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to enroll student';
+      alert(errMsg);
     } finally {
       setSavingStudent(false);
     }
@@ -412,6 +418,17 @@ export default function AdminClassesPage() {
                     />
                   </div>
                   <div>
+                    <label className="block font-bold text-slate-700 mb-1">SAT No. / Roll Number *</label>
+                    <input
+                      type="text"
+                      value={satNumber}
+                      onChange={(e) => setSatNumber(e.target.value)}
+                      required
+                      placeholder="e.g. SAT-2026-001"
+                      className="w-full p-2 border rounded-xl bg-white font-mono font-bold"
+                    />
+                  </div>
+                  <div>
                     <label className="block font-bold text-slate-700 mb-1">Section</label>
                     <select
                       value={studentSectionId}
@@ -476,7 +493,7 @@ export default function AdminClassesPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-100 text-slate-700 font-bold uppercase sticky top-0">
                     <tr>
-                      <th className="py-2.5 px-3">Code</th>
+                      <th className="py-2.5 px-3">SAT No. / Roll No.</th>
                       <th className="py-2.5 px-3">Student Name</th>
                       <th className="py-2.5 px-3">Section</th>
                       <th className="py-2.5 px-3">Parent Name</th>
@@ -488,7 +505,7 @@ export default function AdminClassesPage() {
                   <tbody className="divide-y divide-slate-100">
                     {classStudents.map((s) => (
                       <tr key={s.id} className="hover:bg-slate-50">
-                        <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">{s.student_code}</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">{s.sat_number || s.student_code}</td>
                         <td className="py-2.5 px-3 font-bold text-slate-900">{s.full_name}</td>
                         <td className="py-2.5 px-3">
                           {s.section_name ? (

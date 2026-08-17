@@ -33,10 +33,6 @@ export default function AdminSchoolPage() {
       try {
         const res = await api.get('/auth/me');
         if (res.data.success) {
-          if (res.data.data.role !== 'SUPER_ADMIN') {
-            router.push('/admin');
-            return;
-          }
           setUser(res.data.data);
         }
       } catch (err) {
@@ -89,8 +85,9 @@ export default function AdminSchoolPage() {
       });
       setSuccessMsg('School information updated successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err) {
-      alert('Failed to update school information');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error?.details || err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to update school information';
+      alert(errMsg);
     } finally {
       setSaving(false);
     }

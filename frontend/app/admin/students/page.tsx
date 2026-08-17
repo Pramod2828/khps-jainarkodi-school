@@ -108,6 +108,7 @@ export default function AdminStudentsPage() {
         parent_name: parentName,
         parent_phone: parentPhone,
         address: address,
+        sat_number: studentCode,
         student_code: studentCode
       };
 
@@ -119,7 +120,8 @@ export default function AdminStudentsPage() {
       setIsModalOpen(false);
       loadStudents();
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Failed to save student');
+      const errMsg = err.response?.data?.error?.details || err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to save student';
+      alert(errMsg);
     } finally {
       setSaving(false);
     }
@@ -217,7 +219,7 @@ export default function AdminStudentsPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-100 text-slate-700 font-bold uppercase border-b">
                     <tr>
-                      <th className="py-3.5 px-4">Code</th>
+                      <th className="py-3.5 px-4">SAT No. / Roll No.</th>
                       <th className="py-3.5 px-4">Student Name</th>
                       <th className="py-3.5 px-4">Class & Section</th>
                       <th className="py-3.5 px-4">Parent / Guardian</th>
@@ -229,7 +231,7 @@ export default function AdminStudentsPage() {
                   <tbody className="divide-y divide-slate-100">
                     {students.map((s) => (
                       <tr key={s.id} className="hover:bg-slate-50 transition">
-                        <td className="py-3 px-4 font-mono font-bold text-emerald-700">{s.student_code}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-emerald-700">{s.sat_number || s.student_code}</td>
                         <td className="py-3 px-4 font-bold text-slate-900">{s.full_name}</td>
                         <td className="py-3 px-4">
                           <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-lg">
@@ -341,13 +343,14 @@ export default function AdminStudentsPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Student Code</label>
+                <label className="block font-bold text-slate-700 mb-1">SAT No. / Roll Number *</label>
                 <input
                   type="text"
                   value={studentCode}
                   onChange={(e) => setStudentCode(e.target.value)}
-                  placeholder="Auto-generated if empty"
-                  className="w-full p-2.5 border rounded-xl font-mono"
+                  required
+                  placeholder="e.g. SAT-2026-001"
+                  className="w-full p-2.5 border rounded-xl font-mono font-bold"
                 />
               </div>
 

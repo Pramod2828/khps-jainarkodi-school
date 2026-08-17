@@ -47,20 +47,29 @@ if (!pgPool) {
   });
 }
 
-// Helper to normalize PostgreSQL $1, $2 placeholders from ? syntax
+// Helper to normalize PostgreSQL $1, $2 placeholders and standard functions from MySQL/SQLite syntax
 function convertSqlForPg(sql, params = []) {
   let paramIndex = 1;
-  const convertedSql = sql.replace(/\?/g, () => `$${paramIndex++}`);
-  return { sql: convertedSql, params };
+  let pgSql = sql
+    .replace(/\bNOW\(\)/gi, 'CURRENT_TIMESTAMP')
+    .replace(/\bCURDATE\(\)/gi, 'CURRENT_DATE');
+
+  pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+
+  const pgParams = params.map(p => {
+    if (typeof p === 'string' && /^\d+$/.test(p) && p.length < 10) {
+      const num = parseInt(p, 10);
+      if (!isNaN(num) && String(num) === p) return num;
+    }
+    return p;
+  });
+
+  return { sql: pgSql, params: pgParams };
 }
 
 // Universal database pool interface (Cloud PostgreSQL + MySQL + Automatic SQLite Fallback)
 const pool = {
   query: async (sql, params = []) => {
-    if (useSqlite || process.env.DB_TYPE === 'sqlite') {
-      return await executeSqliteQuery(sql, params);
-    }
-
     if (dbDriver === 'postgres' && pgPool) {
       try {
         const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
@@ -70,11 +79,18 @@ const pool = {
         const insertId = isInsert && rows[0] && rows[0].id ? rows[0].id : res.oid;
         return [rows, { insertId, affectedRows: res.rowCount }];
       } catch (err) {
-        console.warn(`⚠️ Cloud PostgreSQL query error (${err.message}). Falling back to Embedded SQLite...`);
+        console.error(`⚠️ Cloud PostgreSQL query error: ${err.message} (SQL: ${sql})`);
+        if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) {
+          throw err; // Fail fast in production so PostgreSQL remains source of truth
+        }
         useSqlite = true;
         await getSqliteDb();
         return await executeSqliteQuery(sql, params);
       }
+    }
+
+    if (useSqlite || process.env.DB_TYPE === 'sqlite') {
+      return await executeSqliteQuery(sql, params);
     }
 
     try {

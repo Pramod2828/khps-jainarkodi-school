@@ -15,7 +15,7 @@ async function migratePostgres(pool) {
   try {
     console.log('🔄 Checking Cloud PostgreSQL schema and non-destructive data sync...');
 
-    // 1. Create all 20 production tables individually (no trailing semicolons)
+    // 1. Create all production tables individually (no trailing semicolons)
     const createTableQueries = [
       `CREATE TABLE IF NOT EXISTS school_information (
         id SERIAL PRIMARY KEY,
@@ -220,6 +220,20 @@ async function migratePostgres(pool) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )`,
 
+      `CREATE TABLE IF NOT EXISTS downloads (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        file_category VARCHAR(100),
+        file_path TEXT NOT NULL,
+        file_name VARCHAR(255),
+        file_type VARCHAR(100),
+        file_size INT,
+        download_count INT DEFAULT 0,
+        uploaded_by INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`,
+
       `CREATE TABLE IF NOT EXISTS password_resets (
         id SERIAL PRIMARY KEY,
         user_id INT NOT NULL,
@@ -309,36 +323,43 @@ async function migratePostgres(pool) {
     if (fs.existsSync(snapshotPath)) {
       const snapshotData = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));
 
-      for (const [table, rows] of Object.entries(snapshotData)) {
+      for (let [table, rows] of Object.entries(snapshotData)) {
         if (!Array.isArray(rows) || rows.length === 0) continue;
 
-        try {
-          const checkRes = await pool.query(`SELECT COUNT(*) as cnt FROM "${table}"`);
-          if (parseInt(checkRes.rows[0].cnt) === 0) {
-            console.log(`📥 Preserving ${rows.length} existing records into PostgreSQL table: ${table}...`);
-            for (const row of rows) {
-              const keys = Object.keys(row);
-              const vals = Object.values(row);
-              const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-              const colNames = keys.map(k => `"${k}"`).join(', ');
-              
-              const insertSql = `INSERT INTO "${table}" (${colNames}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`;
-              await pool.query(insertSql, vals);
+        let targetTables = [table];
+        if (table === 'downloads') {
+          targetTables = ['downloadable_files', 'downloads'];
+        }
+
+        for (const targetTable of targetTables) {
+          try {
+            const checkRes = await pool.query(`SELECT COUNT(*) as cnt FROM "${targetTable}"`);
+            if (parseInt(checkRes.rows[0].cnt) === 0) {
+              console.log(`📥 Preserving ${rows.length} existing records into PostgreSQL table: ${targetTable}...`);
+              for (const row of rows) {
+                const keys = Object.keys(row);
+                const vals = Object.values(row);
+                const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+                const colNames = keys.map(k => `"${k}"`).join(', ');
+                
+                const insertSql = `INSERT INTO "${targetTable}" (${colNames}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`;
+                await pool.query(insertSql, vals);
+              }
             }
+          } catch (tableCheckErr) {
+            console.warn(`Snapshot check warning for ${targetTable}:`, tableCheckErr.message);
           }
-        } catch (tableCheckErr) {
-          console.warn(`Snapshot check warning for ${table}:`, tableCheckErr.message);
         }
       }
     }
 
-    // 5. Reset PostgreSQL SERIAL sequence to max(id) across all 20 tables so auto-increment works cleanly
+    // 5. Reset PostgreSQL SERIAL sequence to max(id) across all tables so auto-increment works cleanly
     const allTables = [
       'school_information', 'roles', 'users', 'classes', 'sections',
       'subjects', 'students', 'teachers', 'homework', 'homework_attachments',
       'notices', 'announcements', 'activities', 'activity_images',
       'gallery_categories', 'gallery', 'calendar_events', 'downloadable_files',
-      'password_resets', 'audit_logs'
+      'downloads', 'password_resets', 'audit_logs'
     ];
 
     for (const tbl of allTables) {

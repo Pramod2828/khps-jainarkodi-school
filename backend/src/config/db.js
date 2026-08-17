@@ -43,18 +43,25 @@ function getPgPool() {
   return pgPool;
 }
 
+let isMigrating = false;
+let isMigrated = false;
+
 // Ensure schema migration finishes before queries execute
 async function ensurePostgresMigrated() {
   const p = getPgPool();
-  if (!p) return;
-  if (!migrationPromise) {
+  if (!p || isMigrated) return;
+  if (isMigrating) return;
+  isMigrating = true;
+  try {
     console.log('🔄 Executing Cloud PostgreSQL non-destructive schema migration...');
-    migrationPromise = migratePostgres(p).catch(e => {
-      console.error('Migration notice:', e.message);
-      lastDbError = 'Migration notice: ' + e.message;
-    });
+    await migratePostgres(p);
+    isMigrated = true;
+  } catch (e) {
+    console.error('Migration notice:', e.message);
+    lastDbError = 'Migration notice: ' + e.message;
+  } finally {
+    isMigrating = false;
   }
-  await migrationPromise;
 }
 
 // Lazy getter for MySQL pool (Local Dev fallback)

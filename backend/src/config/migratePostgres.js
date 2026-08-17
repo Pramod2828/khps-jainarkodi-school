@@ -13,7 +13,7 @@ async function migratePostgres(connectionString) {
   try {
     console.log('🔄 Checking Cloud PostgreSQL schema and non-destructive data sync...');
 
-    // 1. Create all 18 production tables individually (separate queries to avoid pg multi-command issues)
+    // 1. Create all 18 production tables individually
     const createTableQueries = [
       `CREATE TABLE IF NOT EXISTS school_information (
         id SERIAL PRIMARY KEY,
@@ -248,7 +248,7 @@ async function migratePostgres(connectionString) {
       }
     }
 
-    // 2. Non-destructive ALTER TABLE ADD COLUMN IF NOT EXISTS to guarantee schema compatibility
+    // 2. Non-destructive ALTER TABLE ADD COLUMN IF NOT EXISTS
     const alterTableQueries = [
       `ALTER TABLE notices ADD COLUMN IF NOT EXISTS description TEXT;`,
       `ALTER TABLE notices ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'NORMAL';`,
@@ -285,7 +285,21 @@ async function migratePostgres(connectionString) {
       } catch (alterErr) {}
     }
 
-    // 3. Load snapshot data and sync IF tables are empty
+    // 3. Non-destructive core table seeds
+    const seedQueries = [
+      `INSERT INTO roles (id, role_name, description) VALUES (1, 'SUPER_ADMIN', 'Full access to manage school system'), (2, 'TEACHER', 'Access to manage homework, activities, and students') ON CONFLICT DO NOTHING;`,
+      `INSERT INTO classes (id, class_name, display_order) VALUES (1, '1st Standard', 1), (2, '2nd Standard', 2), (3, '3rd Standard', 3), (4, '4th Standard', 4), (5, '5th Standard', 5) ON CONFLICT DO NOTHING;`,
+      `INSERT INTO sections (id, class_id, section_name) VALUES (1, 1, 'A'), (2, 2, 'A'), (3, 3, 'A'), (4, 4, 'A'), (5, 5, 'A') ON CONFLICT DO NOTHING;`,
+      `INSERT INTO subjects (id, subject_name, subject_code) VALUES (1, 'Kannada', 'KAN'), (2, 'English', 'ENG'), (3, 'Mathematics', 'MATH'), (4, 'Science', 'SCI'), (5, 'Social Science', 'SS') ON CONFLICT DO NOTHING;`
+    ];
+
+    for (const sq of seedQueries) {
+      try {
+        await pool.query(sq);
+      } catch(e) {}
+    }
+
+    // 4. Load snapshot data and sync IF tables are empty
     const snapshotPath = path.join(__dirname, '../../data_snapshot.json');
     if (fs.existsSync(snapshotPath)) {
       const snapshotData = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'));

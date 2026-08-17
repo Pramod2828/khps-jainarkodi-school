@@ -15,7 +15,7 @@ async function migratePostgres(pool) {
   try {
     console.log('🔄 Checking Cloud PostgreSQL schema and non-destructive data sync...');
 
-    // 1. Create all 18 production tables individually (no trailing semicolons)
+    // 1. Create all 20 production tables individually (no trailing semicolons)
     const createTableQueries = [
       `CREATE TABLE IF NOT EXISTS school_information (
         id SERIAL PRIMARY KEY,
@@ -325,16 +325,26 @@ async function migratePostgres(pool) {
               const insertSql = `INSERT INTO "${table}" (${colNames}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`;
               await pool.query(insertSql, vals);
             }
-
-            // Reset PostgreSQL SERIAL sequence to max(id) so auto-increment works cleanly
-            try {
-              await pool.query(`SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE((SELECT MAX(id) FROM "${table}"), 1))`);
-            } catch(seqErr) {}
           }
         } catch (tableCheckErr) {
           console.warn(`Snapshot check warning for ${table}:`, tableCheckErr.message);
         }
       }
+    }
+
+    // 5. Reset PostgreSQL SERIAL sequence to max(id) across all 20 tables so auto-increment works cleanly
+    const allTables = [
+      'school_information', 'roles', 'users', 'classes', 'sections',
+      'subjects', 'students', 'teachers', 'homework', 'homework_attachments',
+      'notices', 'announcements', 'activities', 'activity_images',
+      'gallery_categories', 'gallery', 'calendar_events', 'downloadable_files',
+      'password_resets', 'audit_logs'
+    ];
+
+    for (const tbl of allTables) {
+      try {
+        await pool.query(`SELECT setval(pg_get_serial_sequence('${tbl}', 'id'), COALESCE((SELECT MAX(id) FROM "${tbl}"), 1), true)`);
+      } catch (seqErr) {}
     }
 
     if (!hasError) {

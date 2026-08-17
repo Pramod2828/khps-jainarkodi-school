@@ -165,10 +165,11 @@ async function createHomework(req, res) {
       } catch (e) {}
     }
 
-    // Insert homework
+    // Insert homework with explicit RETURNING id for PostgreSQL
     const [result] = await connection.query(
       `INSERT INTO homework (class_id, section_id, subject_id, custom_subject_name, title, description, homework_date, homework_day, homework_time, due_date, teacher_id, custom_teacher_name, attachment_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id`,
       [
         parseInt(class_id),
         section_id ? parseInt(section_id) : null,
@@ -186,7 +187,7 @@ async function createHomework(req, res) {
       ]
     );
 
-    const homeworkId = (result && result.insertId) || (Array.isArray(result) && result[0] ? result[0].id : null);
+    const homeworkId = (result && result.insertId) || (Array.isArray(result) && result[0] ? result[0].id : null) || (result && result.id);
 
     if (req.file && homeworkId) {
       await connection.query(

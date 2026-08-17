@@ -75,6 +75,8 @@ app.get('/api/health', async (req, res) => {
   const dbConnected = await testConnection();
   const driver = getDbDriverInfo();
   const dbError = getDbError();
+  const rawUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  const urlScheme = rawUrl ? (rawUrl.includes('://') ? rawUrl.split('://')[0] : rawUrl.substring(0, 10)) : 'NONE';
   return res.json({
     status: 'online',
     system: 'Government Primary School Jainarkodi REST API',
@@ -82,6 +84,7 @@ app.get('/api/health', async (req, res) => {
     database: dbConnected ? 'connected' : 'disconnected',
     db_driver: driver,
     is_database_url_configured: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
+    db_url_scheme: urlScheme,
     db_error: dbError || null,
     timestamp: new Date().toISOString()
   });

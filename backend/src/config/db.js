@@ -16,23 +16,25 @@ let mysqlPool = null;
 let sqliteDb = null;
 let lastDbError = null;
 
-// Initialize PostgreSQL pool if DATABASE_URL or POSTGRES_URL is set
-const rawPgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
-const pgUrl = rawPgUrl.trim().replace(/^['"]|['"]$/g, '');
+// Dynamic getter for PostgreSQL URL
+function getPgUrl() {
+  const rawPgUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
+  return rawPgUrl.trim().replace(/^['"]|['"]$/g, '');
+}
 
-if (pgUrl) {
-  if (!PgPool) {
-    lastDbError = 'pg module not found in Node.js runtime';
-    console.error('❌ ' + lastDbError);
-  } else {
+// Lazy getter for PostgreSQL pool
+function getPgPool() {
+  const url = getPgUrl();
+  if (!url) return null;
+  if (!pgPool && PgPool) {
     try {
       dbDriver = 'postgres';
       pgPool = new PgPool({
-        connectionString: pgUrl,
+        connectionString: url,
         ssl: { rejectUnauthorized: false }
       });
       console.log('🔌 Cloud PostgreSQL configuration detected. Running automatic schema & data sync...');
-      migratePostgres(pgUrl).catch(e => {
+      migratePostgres(url).catch(e => {
         console.error('Migration notice:', e.message);
         lastDbError = 'Migration notice: ' + e.message;
       });
@@ -41,20 +43,27 @@ if (pgUrl) {
       lastDbError = 'PgPool init error: ' + err.message;
     }
   }
-} else {
-  mysqlPool = mysql.createPool({
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'school_jainarkodi',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    timezone: '+05:30',
-    dateStrings: true,
-    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-  });
+  return pgPool;
+}
+
+// Lazy getter for MySQL pool (Local Dev fallback)
+function getMysqlPool() {
+  if (!mysqlPool) {
+    mysqlPool = mysql.createPool({
+      host: process.env.DB_HOST || '127.0.0.1',
+      port: parseInt(process.env.DB_PORT || '3306'),
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'school_jainarkodi',
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      timezone: '+05:30',
+      dateStrings: true,
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
+    });
+  }
+  return mysqlPool;
 }
 
 // Helper to normalize PostgreSQL $1, $2 placeholders and standard functions from MySQL/SQLite syntax
@@ -80,11 +89,13 @@ function convertSqlForPg(sql, params = []) {
 // Universal database pool interface (Cloud PostgreSQL + MySQL + Automatic SQLite Fallback)
 const pool = {
   query: async (sql, params = []) => {
-    // 1. Strict PostgreSQL Execution Mode if pgUrl is present
-    if (pgUrl && pgPool) {
+    const activePgPool = getPgPool();
+
+    // 1. Strict PostgreSQL Execution Mode if DATABASE_URL/POSTGRES_URL is configured
+    if (activePgPool) {
       try {
         const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
-        const res = await pgPool.query(pgSql, pgParams);
+        const res = await activePgPool.query(pgSql, pgParams);
         const rows = res.rows || [];
         const isInsert = sql.trim().toUpperCase().startsWith('INSERT');
         const insertId = isInsert && rows[0] && rows[0].id ? rows[0].id : res.oid;
@@ -92,7 +103,7 @@ const pool = {
       } catch (err) {
         console.error(`⚠️ Cloud PostgreSQL query error: ${err.message} (SQL: ${sql})`);
         lastDbError = err.message;
-        throw err; // Strict mode: throw error, never silently fall back to SQLite when pgUrl is present
+        throw err; // Strict mode: throw error, never silently fall back to SQLite when PostgreSQL is configured
       }
     }
 
@@ -103,7 +114,8 @@ const pool = {
 
     // 3. MySQL Execution Mode (Local Dev fallback)
     try {
-      return await mysqlPool.query(sql, params);
+      const activeMysql = getMysqlPool();
+      return await activeMysql.query(sql, params);
     } catch (err) {
       if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ER_ACCESS_DENIED_ERROR') {
         console.warn(`⚠️ MySQL connection unavailable (${err.message}). Switching to Embedded SQLite Database...`);
@@ -116,8 +128,9 @@ const pool = {
   },
 
   getConnection: async () => {
-    if (pgUrl && pgPool) {
-      const client = await pgPool.connect();
+    const activePgPool = getPgPool();
+    if (activePgPool) {
+      const client = await activePgPool.connect();
       return {
         query: async (sql, params) => {
           const { sql: pgSql, params: pgParams } = convertSqlForPg(sql, params);
@@ -149,7 +162,8 @@ const pool = {
     }
 
     try {
-      return await mysqlPool.getConnection();
+      const activeMysql = getMysqlPool();
+      return await activeMysql.getConnection();
     } catch (err) {
       useSqlite = true;
       const sqliteDb = await getSqliteDb();
@@ -203,9 +217,10 @@ async function executeSqliteQuery(sql, params = []) {
 
 // Test connection helper
 async function testConnection() {
-  if (pgUrl && pgPool) {
+  const activePgPool = getPgPool();
+  if (activePgPool) {
     try {
-      const client = await pgPool.connect();
+      const client = await activePgPool.connect();
       console.log('✅ Cloud PostgreSQL Database connected successfully.');
       client.release();
       lastDbError = null;
@@ -224,7 +239,8 @@ async function testConnection() {
   }
 
   try {
-    const connection = await mysqlPool.getConnection();
+    const activeMysql = getMysqlPool();
+    const connection = await activeMysql.getConnection();
     console.log('✅ MySQL Database connected successfully to', process.env.DB_NAME);
     connection.release();
     return true;
@@ -237,7 +253,8 @@ async function testConnection() {
 }
 
 function getDbDriverInfo() {
-  if (pgUrl && pgPool) return 'POSTGRESQL';
+  const activePgPool = getPgPool();
+  if (activePgPool) return 'POSTGRESQL';
   if (useSqlite || process.env.DB_TYPE === 'sqlite') return 'SQLITE_EMBEDDED';
   if (mysqlPool) return 'MYSQL';
   return 'SQLITE_EMBEDDED';

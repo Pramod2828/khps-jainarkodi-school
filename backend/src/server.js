@@ -33,6 +33,15 @@ app.use(helmet({
   crossOriginResourcePolicy: false // Allow static files like images to be served to Next.js / Mobile APKs
 }));
 
+// Prevent API response caching across browsers, CDNs, and proxy caches
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
+
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',

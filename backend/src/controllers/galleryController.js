@@ -87,7 +87,18 @@ async function uploadGalleryPhoto(req, res) {
       return errorResponse(res, 'Image file size must not exceed 5 MB.', 400, 'FILE_TOO_LARGE');
     }
 
-    const imageUrl = `/uploads/${file.filename}`;
+    // Convert uploaded image to Data URL for permanent zero-loss storage across deployments
+    let imageUrl = `/uploads/${file.filename}`;
+    try {
+      if (fs.existsSync(file.path)) {
+        const fileBuffer = fs.readFileSync(file.path);
+        const base64Str = fileBuffer.toString('base64');
+        const mimeType = file.mimetype || 'image/jpeg';
+        imageUrl = `data:${mimeType};base64,${base64Str}`;
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not convert image to base64, falling back to upload path:', e.message);
+    }
 
     const [result] = await pool.query(
       `INSERT INTO gallery (title, description, category_id, image_url, uploaded_by)

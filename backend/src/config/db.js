@@ -1,5 +1,3 @@
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite-async');
 const path = require('path');
 const mysql = require('mysql2/promise');
 const { migratePostgres } = require('./migratePostgres');
@@ -152,7 +150,7 @@ const pool = {
       }
     }
 
-    // 2. Embedded SQLite Execution Mode
+    // 2. Embedded SQLite Execution Mode (Local dev only)
     if (useSqlite || process.env.DB_TYPE === 'sqlite') {
       return await executeSqliteQuery(sql, params);
     }
@@ -234,11 +232,16 @@ const pool = {
   }
 };
 
-// SQLite Initialization & Helper
+// SQLite Initialization & Helper (Lazy loaded to avoid module missing errors in production)
 async function getSqliteDb() {
   if (!sqliteDb) {
-    const { initSqliteDb } = require('./sqliteDb');
-    sqliteDb = await initSqliteDb();
+    try {
+      const { initSqliteDb } = require('./sqliteDb');
+      sqliteDb = await initSqliteDb();
+    } catch (err) {
+      console.error('⚠️ SQLite loading error:', err.message);
+      throw err;
+    }
   }
   return sqliteDb;
 }

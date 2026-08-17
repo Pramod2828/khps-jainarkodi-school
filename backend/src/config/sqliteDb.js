@@ -23,6 +23,16 @@ async function getSqliteDb() {
 async function initSqliteSchema(db) {
   await db.exec('PRAGMA foreign_keys = ON;');
 
+  // 0. Subjects (Guaranteed Table)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS subjects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      subject_name TEXT NOT NULL,
+      subject_code TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // 1. Roles
   await db.exec(`
     CREATE TABLE IF NOT EXISTS roles (

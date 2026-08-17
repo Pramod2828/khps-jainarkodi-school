@@ -52,28 +52,31 @@ async function getHomeworkList(req, res) {
 
     const whereSql = whereClauses.join(' AND ');
 
+    // Guarantee subjects table exists
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS subjects (id SERIAL PRIMARY KEY, subject_name VARCHAR(100) NOT NULL, subject_code VARCHAR(50));`);
+    } catch(e) {}
+
     const [countRows] = await pool.query(
       `SELECT COUNT(*) as total
        FROM homework h
-       JOIN classes c ON h.class_id = c.id
-       LEFT JOIN subjects sub ON h.subject_id = sub.id
-       LEFT JOIN users u ON h.teacher_id = u.id
+       LEFT JOIN classes c ON h.class_id = c.id
        WHERE ${whereSql}`,
       queryParams
     );
 
-    const total = countRows[0].total;
+    const total = countRows[0] ? countRows[0].total : 0;
 
     const [rows] = await pool.query(
-      `SELECT h.id, h.class_id, c.class_name, h.section_id, sec.section_name,
-              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name, 'General') as subject_name, sub.subject_code,
+      `SELECT h.id, h.class_id, COALESCE(c.class_name, 'Class') as class_name, h.section_id, sec.section_name,
+              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name, 'General') as subject_name, COALESCE(sub.subject_code, 'GEN') as subject_code,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time,
               h.due_date, h.teacher_id, h.custom_teacher_name, h.custom_subject_name,
               COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
               att.file_path, att.file_name, att.file_type, att.file_size,
               h.created_at, h.updated_at
        FROM homework h
-       JOIN classes c ON h.class_id = c.id
+       LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN sections sec ON h.section_id = sec.id
        LEFT JOIN subjects sub ON h.subject_id = sub.id
        LEFT JOIN users u ON h.teacher_id = u.id

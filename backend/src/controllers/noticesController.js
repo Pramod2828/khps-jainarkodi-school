@@ -17,7 +17,7 @@ async function getNotices(req, res) {
     const { priority, is_archived, search } = req.query;
 
     // First auto-archive notices past expiry date
-    await pool.query('UPDATE notices SET is_archived = 1 WHERE expiry_date IS NOT NULL AND expiry_date < CURDATE() AND is_archived = 0');
+    await pool.query('UPDATE notices SET is_archived = 1 WHERE expiry_date IS NOT NULL AND expiry_date < CURRENT_DATE AND is_archived = 0');
 
     let whereClauses = ['1=1'];
     let queryParams = [];

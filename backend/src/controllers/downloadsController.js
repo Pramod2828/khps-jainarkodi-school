@@ -33,7 +33,7 @@ async function getDownloads(req, res) {
 
     const [rows] = await pool.query(
       `SELECT d.id, d.title, d.description, d.class_id, c.class_name, d.category,
-              d.file_url, d.file_size, d.file_type, d.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, d.created_at
+              COALESCE(d.file_url, d.file_path) as file_url, COALESCE(d.file_path, d.file_url) as file_path, d.file_size, d.file_type, d.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, d.created_at
        FROM downloads d
        LEFT JOIN classes c ON d.class_id = c.id
        LEFT JOIN users u ON d.uploaded_by = u.id
@@ -82,14 +82,15 @@ async function createDownload(req, res) {
     const uploaderId = req.user ? req.user.id : 1;
 
     const [result, meta] = await pool.query(
-      `INSERT INTO downloads (title, description, class_id, category, file_url, file_size, file_type, uploaded_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO downloads (title, description, class_id, category, file_url, file_path, file_size, file_type, uploaded_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING id`,
       [
         title.trim(),
         description ? description.trim() : null,
         class_id && class_id !== 'all' ? parseInt(class_id) : null,
         category || 'Worksheets',
+        fileUrl,
         fileUrl,
         req.file.size,
         ext,

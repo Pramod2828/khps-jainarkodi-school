@@ -17,7 +17,15 @@ async function getSqliteDb() {
       return db;
     });
   }
-  return dbPromise;
+  const db = await dbPromise;
+  try {
+    await db.exec(`CREATE TABLE IF NOT EXISTS subjects (id INTEGER PRIMARY KEY AUTOINCREMENT, subject_name TEXT NOT NULL, subject_code TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);`);
+    const subCnt = await db.get('SELECT COUNT(*) as cnt FROM subjects');
+    if (subCnt.cnt === 0) {
+      await db.exec(`INSERT INTO subjects (id, subject_name, subject_code) VALUES (1, 'Kannada', 'KAN'), (2, 'English', 'ENG'), (3, 'Mathematics', 'MATH'), (4, 'Science', 'SCI'), (5, 'Social Science', 'SS');`);
+    }
+  } catch (e) {}
+  return db;
 }
 
 async function initSqliteSchema(db) {

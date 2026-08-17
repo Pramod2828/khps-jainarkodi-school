@@ -6,7 +6,7 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/AdminHeader';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
-import { api } from '@/services/api';
+import { api, openFileUrl } from '@/services/api';
 import { User, DownloadItem, ClassItem } from '@/types';
 import { Download, Plus, Pencil, Trash2, X, FileText } from 'lucide-react';
 
@@ -180,6 +180,13 @@ export default function AdminDownloadsPage() {
                         <td className="py-3 px-4 text-slate-600">{d.uploader_name}</td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => openFileUrl(d.file_url || d.file_path, d.title)}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition"
+                              title="View / Download File"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => openEditModal(d)}
                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition"

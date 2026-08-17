@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
-import { api, getAssetUrl } from '@/services/api';
+import { api, getAssetUrl, IMAGE_FALLBACK_SVG } from '@/services/api';
 import { GalleryItem, GalleryCategory } from '@/types';
 import { Image as ImageIcon, X, Maximize2 } from 'lucide-react';
 
@@ -114,6 +114,7 @@ export default function GalleryPublicPage() {
                     src={getAssetUrl(photo.image_url)}
                     alt={photo.title}
                     loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).src = IMAGE_FALLBACK_SVG; }}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
                   <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">

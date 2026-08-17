@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
-import { api, getAssetUrl } from '@/services/api';
+import { api, getAssetUrl, openFileUrl } from '@/services/api';
 import { DownloadItem, ClassItem } from '@/types';
 import { Download, FileText, Search } from 'lucide-react';
 
@@ -150,14 +150,13 @@ export default function DownloadsPublicPage() {
                   <span className="text-[11px] font-semibold text-slate-400 uppercase">
                     {item.file_type || 'PDF'}
                   </span>
-                  <a
-                    href={getAssetUrl(item.file_url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs"
+                  <button
+                    type="button"
+                    onClick={() => openFileUrl(item.file_url, item.title)}
+                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-xs cursor-pointer"
                   >
                     <Download className="w-4 h-4" /> Download File
-                  </a>
+                  </button>
                 </div>
               </div>
             ))}

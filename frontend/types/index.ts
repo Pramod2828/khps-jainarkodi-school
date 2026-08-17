@@ -183,6 +183,7 @@ export interface DownloadItem {
   class_name?: string;
   category: string;
   file_url: string;
+  file_path?: string;
   file_size?: number;
   file_type?: string;
   uploader_name?: string;

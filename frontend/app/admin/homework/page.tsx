@@ -6,7 +6,7 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/AdminHeader';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
-import { api, getAssetUrl } from '@/services/api';
+import { api, getAssetUrl, openFileUrl } from '@/services/api';
 import { User, Homework, ClassItem, SubjectItem } from '@/types';
 import { BookOpen, Plus, Search, Edit3, Trash2, X, UserCheck, FileText, Download, Eye } from 'lucide-react';
 
@@ -280,15 +280,14 @@ export default function AdminHomeworkPage() {
                           <td className="py-3 px-4 max-w-xs font-bold text-slate-800 truncate">{hw.title}</td>
                           <td className="py-3 px-4">
                             {attachUrl ? (
-                              <a
-                                href={getAssetUrl(attachUrl)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 hover:bg-emerald-100"
+                              <button
+                                type="button"
+                                onClick={() => openFileUrl(attachUrl, hw.file_name || hw.title)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 hover:bg-emerald-100 cursor-pointer"
                               >
                                 {isImage ? <Eye className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
                                 {isImage ? 'View Image' : 'Download Attachment'}
-                              </a>
+                              </button>
                             ) : (
                               <span className="text-slate-400 italic">No File</span>
                             )}

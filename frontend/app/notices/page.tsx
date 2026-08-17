@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import LoadingState from '@/components/LoadingState';
 import EmptyState from '@/components/EmptyState';
-import { api, getAssetUrl } from '@/services/api';
+import { api, getAssetUrl, openFileUrl } from '@/services/api';
 import { Notice } from '@/types';
 import { Bell, Search, Download, Calendar, ShieldAlert, Archive } from 'lucide-react';
 
@@ -172,14 +172,13 @@ export default function NoticesPublicPage() {
                       <span className="text-rose-600 font-semibold shrink-0">Valid Until: {n.expiry_date}</span>
                     )}
                     {n.attachment_url && (
-                      <a
-                        href={getAssetUrl(n.attachment_url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-emerald-800 transition w-full sm:w-auto text-center"
+                      <button
+                        type="button"
+                        onClick={() => openFileUrl(n.attachment_url, n.title || 'notice')}
+                        className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-emerald-800 transition w-full sm:w-auto text-center cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" /> Download Notice PDF
-                      </a>
+                      </button>
                     )}
                   </div>
                 </div>

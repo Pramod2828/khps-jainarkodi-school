@@ -8,7 +8,9 @@ function getMigrationError() {
 }
 
 async function migratePostgres(pool) {
-  if (!pool) return;
+  if (!pool) return false;
+
+  lastMigrationError = null;
 
   try {
     console.log('🔄 Checking Cloud PostgreSQL schema and non-destructive data sync...');
@@ -240,12 +242,14 @@ async function migratePostgres(pool) {
       )`
     ];
 
+    let hasError = false;
     for (const q of createTableQueries) {
       try {
         await pool.query(q);
       } catch (tableErr) {
-        console.error(`Table Query Warning: ${tableErr.message} (Query: ${q.substring(0, 50)})`);
+        console.error(`Table Query Error: ${tableErr.message} (Query: ${q.substring(0, 50)})`);
         lastMigrationError = `Create Table Error: ${tableErr.message}`;
+        hasError = true;
       }
     }
 
@@ -333,10 +337,16 @@ async function migratePostgres(pool) {
       }
     }
 
-    console.log('✅ PostgreSQL Schema & Data Sync verified 100% cleanly!');
+    if (!hasError) {
+      console.log('✅ PostgreSQL Schema & Data Sync verified 100% cleanly!');
+      return true;
+    } else {
+      return false;
+    }
   } catch (err) {
     console.error('⚠️ PostgreSQL Migration Notice:', err.message);
     lastMigrationError = err.message;
+    return false;
   }
 }
 

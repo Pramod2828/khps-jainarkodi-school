@@ -60,8 +60,10 @@ async function ensurePostgresMigrated() {
   isMigrating = true;
   try {
     console.log('🔄 Executing Cloud PostgreSQL non-destructive schema migration...');
-    await migratePostgres(p);
-    isMigrated = true;
+    const ok = await migratePostgres(p);
+    if (ok) {
+      isMigrated = true;
+    }
   } catch (e) {
     console.error('Migration notice:', e.message);
     lastDbError = 'Migration notice: ' + e.message;

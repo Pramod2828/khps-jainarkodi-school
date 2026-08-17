@@ -64,6 +64,12 @@ async function migratePostgres(connectionString) {
         section_name VARCHAR(10) NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS subjects (
+        id SERIAL PRIMARY KEY,
+        subject_name VARCHAR(100) NOT NULL,
+        subject_code VARCHAR(50)
+      );
+
       CREATE TABLE IF NOT EXISTS students (
         id SERIAL PRIMARY KEY,
         student_code VARCHAR(50) UNIQUE NOT NULL,

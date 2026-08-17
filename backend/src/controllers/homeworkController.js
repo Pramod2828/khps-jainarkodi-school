@@ -56,7 +56,7 @@ async function getHomeworkList(req, res) {
       `SELECT COUNT(*) as total
        FROM homework h
        JOIN classes c ON h.class_id = c.id
-       JOIN subjects sub ON h.subject_id = sub.id
+       LEFT JOIN subjects sub ON h.subject_id = sub.id
        LEFT JOIN users u ON h.teacher_id = u.id
        WHERE ${whereSql}`,
       queryParams
@@ -66,7 +66,7 @@ async function getHomeworkList(req, res) {
 
     const [rows] = await pool.query(
       `SELECT h.id, h.class_id, c.class_name, h.section_id, sec.section_name,
-              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name) as subject_name, sub.subject_code,
+              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name, 'General') as subject_name, sub.subject_code,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time,
               h.due_date, h.teacher_id, h.custom_teacher_name, h.custom_subject_name,
               COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
@@ -75,7 +75,7 @@ async function getHomeworkList(req, res) {
        FROM homework h
        JOIN classes c ON h.class_id = c.id
        LEFT JOIN sections sec ON h.section_id = sec.id
-       JOIN subjects sub ON h.subject_id = sub.id
+       LEFT JOIN subjects sub ON h.subject_id = sub.id
        LEFT JOIN users u ON h.teacher_id = u.id
        LEFT JOIN homework_attachments att ON h.id = att.homework_id
        WHERE ${whereSql}
@@ -107,7 +107,7 @@ async function getHomeworkById(req, res) {
 
     const [rows] = await pool.query(
       `SELECT h.id, h.class_id, c.class_name, h.section_id, sec.section_name,
-              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name) as subject_name, sub.subject_code,
+              h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name, 'General') as subject_name, sub.subject_code,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time,
               h.due_date, h.teacher_id, h.custom_teacher_name, h.custom_subject_name,
               COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
@@ -116,7 +116,7 @@ async function getHomeworkById(req, res) {
        FROM homework h
        JOIN classes c ON h.class_id = c.id
        LEFT JOIN sections sec ON h.section_id = sec.id
-       JOIN subjects sub ON h.subject_id = sub.id
+       LEFT JOIN subjects sub ON h.subject_id = sub.id
        LEFT JOIN users u ON h.teacher_id = u.id
        LEFT JOIN homework_attachments att ON h.id = att.homework_id
        WHERE h.id = ?`,

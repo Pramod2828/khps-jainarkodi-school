@@ -2,6 +2,7 @@ const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { saveSnapshot, restoreSnapshot } = require('./dataSync');
 
 let dbPromise = null;
 
@@ -460,6 +461,9 @@ async function initSqliteSchema(db) {
     }
   } catch (e) {}
 
+  // Restore snapshot of user's latest updated data (persists across server restarts/spin-downs)
+  await restoreSnapshot(db);
+
   console.log('✅ SQLite Database schema & demo tables initialized perfectly!');
 }
 
@@ -493,9 +497,11 @@ async function executeSqliteQuery(sql, params = []) {
     return [rows];
   } else if (trimmedSql.startsWith('INSERT')) {
     const res = await db.run(convertedSql, cleanParams);
+    saveSnapshot(db);
     return [{ insertId: res.lastID, affectedRows: res.changes }];
   } else {
     const res = await db.run(convertedSql, cleanParams);
+    saveSnapshot(db);
     return [{ affectedRows: res.changes }];
   }
 }

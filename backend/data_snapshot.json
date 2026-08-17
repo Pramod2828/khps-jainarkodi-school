@@ -1,0 +1,330 @@
+{
+  "school_information": [
+    {
+      "id": 1,
+      "school_name": "K H P S JAINARAKODI",
+      "tagline": "Learning today, building a better tomorrow.",
+      "logo_url": "/logo.png",
+      "address": "Jainarkodi\nDist:- Belgavi\nTq:- Mudalgi",
+      "phone": "97410 32052",
+      "email": "contact@jainarkodi.edu.in",
+      "head_teacher": "Mr. B N Pujeri sir",
+      "description": "K H P S Jainarkodi is dedicated to providing holistic primary education, fostering critical thinking, moral values, and academic excellence for children from LKG to 7th Standard in a warm, nurturing community environment.",
+      "timings": "Monday – Friday: 9:00 AM – 4:45 PM | Saturday: 8:00 AM – 12:00 PM",
+      "hero_image": null,
+      "map_url": "https://maps.app.goo.gl/CcYsDyy1ZH3STTzs7",
+      "updated_at": "2026-08-15 14:12:48"
+    }
+  ],
+  "homework": [
+    {
+      "id": 8,
+      "class_id": 9,
+      "section_id": null,
+      "subject_id": 1,
+      "title": "tabels",
+      "description": "write tabels up to 29",
+      "homework_date": "2026-08-15",
+      "homework_day": "Saturday",
+      "homework_time": "16:00:00",
+      "due_date": "2026-08-16",
+      "teacher_id": 1,
+      "custom_teacher_name": null,
+      "created_at": "2026-08-15 16:29:26",
+      "updated_at": "2026-08-15 16:29:26",
+      "custom_subject_name": null
+    },
+    {
+      "id": 9,
+      "class_id": 7,
+      "section_id": null,
+      "subject_id": 1,
+      "title": "qwerfg",
+      "description": "qwdefd",
+      "homework_date": "2026-08-15",
+      "homework_day": "Saturday",
+      "homework_time": "16:00:00",
+      "due_date": "2026-08-16",
+      "teacher_id": 1,
+      "custom_teacher_name": "pramod",
+      "created_at": "2026-08-15 16:35:18",
+      "updated_at": "2026-08-15 16:35:18",
+      "custom_subject_name": "drawing"
+    },
+    {
+      "id": 10,
+      "class_id": 7,
+      "section_id": null,
+      "subject_id": 1,
+      "title": "zx",
+      "description": "cv",
+      "homework_date": "2026-08-15",
+      "homework_day": "Saturday",
+      "homework_time": "16:00:00",
+      "due_date": "2026-08-16",
+      "teacher_id": 1,
+      "custom_teacher_name": "asdfghjkl",
+      "created_at": "2026-08-15 16:36:02",
+      "updated_at": "2026-08-15 16:36:02",
+      "custom_subject_name": "gf"
+    },
+    {
+      "id": 11,
+      "class_id": 7,
+      "section_id": null,
+      "subject_id": 1,
+      "title": "fgh",
+      "description": "dfgh",
+      "homework_date": "2026-08-15",
+      "homework_day": "Saturday",
+      "homework_time": "16:00:00",
+      "due_date": "2026-08-16",
+      "teacher_id": 1,
+      "custom_teacher_name": "asdfghjk",
+      "created_at": "2026-08-15 16:36:40",
+      "updated_at": "2026-08-15 16:36:40",
+      "custom_subject_name": "drawing"
+    },
+    {
+      "id": 15,
+      "class_id": 8,
+      "section_id": null,
+      "subject_id": 1,
+      "title": "chapter 3",
+      "description": "draw an apple",
+      "homework_date": "2026-08-16",
+      "homework_day": "Sunday",
+      "homework_time": "16:00:00",
+      "due_date": "2026-08-17",
+      "teacher_id": 1,
+      "custom_teacher_name": "tarun",
+      "created_at": "2026-08-16 05:12:09",
+      "updated_at": "2026-08-16 05:12:09",
+      "custom_subject_name": "drawing"
+    }
+  ],
+  "homework_attachments": [],
+  "notices": [
+    {
+      "id": 2,
+      "title": "Parent-Teacher Meeting (PTM)",
+      "description": "Parent-Teacher meeting for 1st to 5th Standard is scheduled for Monday, August 24th from 10:00 AM to 1:00 PM.",
+      "priority": "IMPORTANT",
+      "notice_date": "2026-08-12",
+      "notice_time": "11:00:00",
+      "expiry_date": "2026-08-25",
+      "attachment_url": null,
+      "is_archived": 0,
+      "created_by": 1,
+      "created_at": "2026-08-15 14:12:47",
+      "updated_at": "2026-08-15 14:12:47"
+    }
+  ],
+  "announcements": [
+    {
+      "id": 3,
+      "content": "welcome to our school",
+      "is_active": 1,
+      "is_banner": 1,
+      "created_by": 1,
+      "created_at": "2026-08-15 16:01:33",
+      "updated_at": "2026-08-15 16:01:33"
+    }
+  ],
+  "activities": [],
+  "activity_images": [
+    {
+      "id": 1,
+      "activity_id": 3,
+      "image_url": "/uploads/1786865013540-35461138-var_photo.jpeg",
+      "caption": null,
+      "created_at": "2026-08-16 07:23:33"
+    }
+  ],
+  "gallery_categories": [
+    {
+      "id": 1,
+      "category_name": "Academic",
+      "description": "Classroom learning activities",
+      "created_at": "2026-08-15 14:12:48"
+    },
+    {
+      "id": 2,
+      "category_name": "Sports",
+      "description": "Sports competitions",
+      "created_at": "2026-08-15 14:12:48"
+    },
+    {
+      "id": 3,
+      "category_name": "Cultural",
+      "description": "School day and celebrations",
+      "created_at": "2026-08-15 14:12:48"
+    },
+    {
+      "id": 4,
+      "category_name": "Campus",
+      "description": "School infrastructure",
+      "created_at": "2026-08-15 14:12:48"
+    }
+  ],
+  "gallery": [],
+  "students": [
+    {
+      "id": 6,
+      "student_code": "1234",
+      "full_name": "PRAMOD PRAKASH JAIN",
+      "class_id": 2,
+      "section_id": 3,
+      "parent_name": "dfdgfdg",
+      "parent_phone": "1234512343254",
+      "address": "At:- JAINARKODI POST:- ARABHAVIMATH TQ:- GOKAK DIST:- BELGAVI PIN:- 591306",
+      "status": "ACTIVE",
+      "created_at": "2026-08-15 16:38:50",
+      "updated_at": "2026-08-15 16:38:50",
+      "photo_url": null,
+      "is_active": 1
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "name": "Super Admin",
+      "email": "admin@jainarkodi.edu.in",
+      "phone": "9741032052",
+      "password_hash": "$2a$10$XbcZE/gpfc.4ilfcLCv7jeb0Cb9i8lTvu2WuJnFYu.ICQx8TUPu4y",
+      "role_id": 1,
+      "status": "ACTIVE",
+      "must_change_password": 0,
+      "last_login_at": "2026-08-16 07:40:35",
+      "created_at": "2026-08-15 14:12:47",
+      "updated_at": "2026-08-15 14:12:47",
+      "plain_password": "admin@123"
+    },
+    {
+      "id": 3,
+      "name": "Teacher Anitha",
+      "email": "teacher@jainarkodi.edu.in",
+      "phone": "9876543211",
+      "password_hash": "$2a$10$7KKkk1TihWiYFjdsDIgd3uPraFtHemoBJz0iMIaIQwBZv3STv7OY.",
+      "role_id": 2,
+      "status": "ACTIVE",
+      "must_change_password": 0,
+      "last_login_at": "2026-08-16 10:12:39",
+      "created_at": "2026-08-15 16:55:42",
+      "updated_at": "2026-08-15 16:55:42",
+      "plain_password": "teacher@123"
+    },
+    {
+      "id": 4,
+      "name": "PRAMOD PRAKASH JAIN",
+      "email": "8867579108-2@ybl",
+      "phone": "1234567890",
+      "password_hash": "$2a$10$7KKkk1TihWiYFjdsDIgd3uPraFtHemoBJz0iMIaIQwBZv3STv7OY.",
+      "role_id": 2,
+      "status": "ACTIVE",
+      "must_change_password": 0,
+      "last_login_at": null,
+      "created_at": "2026-08-15 17:34:57",
+      "updated_at": "2026-08-15 17:34:57",
+      "plain_password": "teacher@123"
+    },
+    {
+      "id": 5,
+      "name": "mahantesh",
+      "email": "mahantesh@gmail.com",
+      "phone": "1234567890",
+      "password_hash": "$2a$10$7KKkk1TihWiYFjdsDIgd3uPraFtHemoBJz0iMIaIQwBZv3STv7OY.",
+      "role_id": 2,
+      "status": "ACTIVE",
+      "must_change_password": 0,
+      "last_login_at": "2026-08-16 05:11:50",
+      "created_at": "2026-08-15 17:53:58",
+      "updated_at": "2026-08-15 17:53:58",
+      "plain_password": "teacher@123"
+    },
+    {
+      "id": 6,
+      "name": "pramod",
+      "email": "jainpramod229@gmail.com",
+      "phone": "8867579108",
+      "password_hash": "$2a$10$7KKkk1TihWiYFjdsDIgd3uPraFtHemoBJz0iMIaIQwBZv3STv7OY.",
+      "role_id": 2,
+      "status": "ACTIVE",
+      "must_change_password": 0,
+      "last_login_at": null,
+      "created_at": "2026-08-16 05:27:41",
+      "updated_at": "2026-08-16 05:27:41",
+      "plain_password": "teacher@123"
+    }
+  ],
+  "calendar_events": [
+    {
+      "id": 1,
+      "title": "Independence Day Flag Hoisting",
+      "description": "National flag hoisting and patriotic songs program.",
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-15",
+      "event_type": "CELEBRATION",
+      "created_by": 1,
+      "created_at": "2026-08-15 14:12:48"
+    },
+    {
+      "id": 2,
+      "title": "Parent-Teacher Meeting",
+      "description": "Term 1 progress review with parents.",
+      "start_date": "2026-08-24",
+      "end_date": "2026-08-24",
+      "event_type": "PARENT_MEETING",
+      "created_by": 1,
+      "created_at": "2026-08-15 14:12:48"
+    },
+    {
+      "id": 3,
+      "title": "nagar panchami",
+      "description": "due to nagar panchami",
+      "start_date": "2026-08-17",
+      "end_date": "2026-08-15",
+      "event_type": "HOLIDAY",
+      "created_by": 1,
+      "created_at": "2026-08-15 14:46:28"
+    }
+  ],
+  "downloads": [
+    {
+      "id": 1,
+      "title": "Class 3 Maths Multiplication Practice Sheet",
+      "description": "Worksheet containing 30 practice problems on 2-digit multiplication.",
+      "class_id": 4,
+      "category": "Worksheets",
+      "file_url": "/uploads/demo_maths_worksheet.pdf",
+      "file_size": 450000,
+      "file_type": "pdf",
+      "uploaded_by": 2,
+      "created_at": "2026-08-15 14:12:48"
+    },
+    {
+      "id": 2,
+      "title": "Class 1 Kannada Alphabet Tracing Guide",
+      "description": "Practice guide for writing Kannada vowels and consonants.",
+      "class_id": 2,
+      "category": "Study Material",
+      "file_url": "/uploads/demo_kannada_guide.pdf",
+      "file_size": 820000,
+      "file_type": "pdf",
+      "uploaded_by": 2,
+      "created_at": "2026-08-15 14:12:48"
+    },
+    {
+      "id": 3,
+      "title": "notes",
+      "description": "notes for 7th standard students",
+      "class_id": 9,
+      "category": "Study Material",
+      "file_url": "/uploads/1786806922944-179521704-Tarun_Jain_4th_sem_result_.pdf",
+      "file_size": 242947,
+      "file_type": "pdf",
+      "uploaded_by": 1,
+      "created_at": "2026-08-15 15:15:22"
+    }
+  ]
+}

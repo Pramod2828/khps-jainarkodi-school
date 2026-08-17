@@ -70,7 +70,12 @@ export default function HomePage() {
         if (hwRes.data.success) setLatestHomework(hwRes.data.data || []);
         if (galRes && galRes.data && galRes.data.success) setGalleryPhotos(galRes.data.data || []);
         if (calRes.data.success) {
-          const todayStr = new Date().toISOString().split('T')[0];
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const todayStr = `${year}-${month}-${day}`;
+
           const activeUpcoming = (calRes.data.data || []).filter(
             (ev: CalendarEvent) => (ev.end_date || ev.start_date) >= todayStr
           );
@@ -467,27 +472,43 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="space-y-3 flex-1">
-                {upcomingEvents.map((ev) => (
-                  <div key={ev.id} className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/60 flex items-center gap-3.5 hover:border-emerald-500/50 transition">
-                    <div className="bg-gradient-to-b from-emerald-500 to-teal-600 text-white text-center p-2 rounded-xl shrink-0 min-w-[54px] shadow-sm">
-                      <div className="text-[10px] font-extrabold uppercase tracking-wider">
-                        {new Date(ev.start_date).toLocaleString('default', { month: 'short' })}
+                {upcomingEvents.map((ev) => {
+                  const now = new Date();
+                  const year = now.getFullYear();
+                  const month = String(now.getMonth() + 1).padStart(2, '0');
+                  const day = String(now.getDate()).padStart(2, '0');
+                  const todayStr = `${year}-${month}-${day}`;
+                  const isToday = ev.start_date <= todayStr && (ev.end_date || ev.start_date) >= todayStr;
+
+                  return (
+                    <div key={ev.id} className={`p-3.5 rounded-2xl border flex items-center gap-3.5 transition ${isToday ? 'bg-slate-800 border-amber-400/80 shadow-md' : 'bg-slate-800/80 border-slate-700/60 hover:border-emerald-500/50'}`}>
+                      <div className={`text-white text-center p-2 rounded-xl shrink-0 min-w-[54px] shadow-sm ${isToday ? 'bg-gradient-to-b from-amber-500 to-amber-600 text-slate-950 font-black' : 'bg-gradient-to-b from-emerald-500 to-teal-600'}`}>
+                        <div className={`text-[10px] font-extrabold uppercase tracking-wider ${isToday ? 'text-slate-950' : 'text-white'}`}>
+                          {new Date(ev.start_date).toLocaleString('default', { month: 'short' })}
+                        </div>
+                        <div className="text-xl font-black leading-none mt-0.5">
+                          {new Date(ev.start_date).getDate()}
+                        </div>
                       </div>
-                      <div className="text-xl font-black leading-none mt-0.5">
-                        {new Date(ev.start_date).getDate()}
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">
+                            {ev.event_type ? ev.event_type.replace('_', ' ') : 'EVENT'}
+                          </span>
+                          {isToday && (
+                            <span className="bg-amber-400 text-slate-950 font-black px-1.5 py-0.2 rounded text-[9px] uppercase tracking-wider animate-pulse">
+                              TODAY
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-xs sm:text-sm font-bold text-white leading-snug truncate">{ev.title}</h4>
+                        {ev.description && (
+                          <p className="text-[11px] text-slate-300 line-clamp-1 leading-relaxed">{ev.description}</p>
+                        )}
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">
-                        {ev.event_type}
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-bold text-white leading-snug truncate">{ev.title}</h4>
-                      {ev.description && (
-                        <p className="text-[11px] text-slate-300 line-clamp-1 leading-relaxed">{ev.description}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>

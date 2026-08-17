@@ -18,7 +18,7 @@ async function getCalendarEvents(req, res) {
     }
 
     if (upcoming === 'true') {
-      query += " AND COALESCE(ce.end_date, ce.start_date) >= DATE('now', 'localtime')";
+      query += " AND COALESCE(ce.end_date, ce.start_date) >= DATE('now', '-1 day')";
     }
 
     query += ' ORDER BY ce.start_date ASC';

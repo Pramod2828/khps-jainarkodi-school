@@ -72,9 +72,7 @@ export default function AdminActivitiesPage() {
         }
       }
 
-      await api.post('/activities', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await api.post('/activities', formData);
 
       setIsModalOpen(false);
       setTitle('');

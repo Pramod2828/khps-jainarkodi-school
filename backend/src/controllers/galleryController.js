@@ -71,7 +71,7 @@ async function uploadGalleryPhoto(req, res) {
   try {
     const { title, description, category_id } = req.body;
 
-    const file = req.file || (req.files && (req.files.photo?.[0] || req.files.image?.[0]));
+    const file = req.file || (Array.isArray(req.files) && req.files.length > 0 ? req.files[0] : (req.files && (req.files.photo?.[0] || req.files.image?.[0])));
 
     if (!file) {
       return errorResponse(res, 'An image file is required for gallery upload.', 400, 'VALIDATION_ERROR');

@@ -68,9 +68,7 @@ export default function AdminGalleryPage() {
       formData.append('category_id', categoryId);
       formData.append('photo', file);
 
-      await api.post('/gallery', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await api.post('/gallery', formData);
 
       setIsModalOpen(false);
       setTitle('');

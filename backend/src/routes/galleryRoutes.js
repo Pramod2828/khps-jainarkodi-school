@@ -12,10 +12,7 @@ router.post(
   '/', 
   verifyToken, 
   requireTeacherOrAdmin, 
-  upload.fields([
-    { name: 'photo', maxCount: 1 },
-    { name: 'image', maxCount: 1 }
-  ]), 
+  upload.any(), 
   galleryController.uploadGalleryPhoto
 );
 router.delete('/:id', verifyToken, requireTeacherOrAdmin, galleryController.deleteGalleryPhoto);

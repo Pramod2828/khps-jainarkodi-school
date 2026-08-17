@@ -297,8 +297,6 @@ async function migratePostgres(connectionString) {
     console.log('✅ PostgreSQL Schema & Data Sync verified 100% cleanly!');
   } catch (err) {
     console.error('⚠️ PostgreSQL Migration Notice:', err.message);
-  } finally {
-    await pool.end();
   }
 }
 

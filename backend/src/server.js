@@ -84,6 +84,8 @@ app.get('/api/health', async (req, res) => {
     database: dbConnected ? 'connected' : 'disconnected',
     db_driver: driver,
     is_database_url_configured: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
+    database_url_len: process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 0,
+    postgres_url_len: process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0,
     db_url_scheme: urlScheme,
     db_error: dbError || null,
     timestamp: new Date().toISOString()

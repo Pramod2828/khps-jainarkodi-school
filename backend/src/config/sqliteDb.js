@@ -381,8 +381,6 @@ async function initSqliteSchema(db) {
       INSERT INTO school_information (id, school_name, tagline, logo_url, address, phone, email, head_teacher, description, timings, map_url) VALUES
       (1, 'K H P S JAINARAKODI', 'Learning today, building a better tomorrow.', '/logo.png', 'Jainarkodi\nDist:- Belgavi\nTq:- Mudalgi', '97410 32052', 'contact@jainarkodi.edu.in', 'Mr. B N Pujeri sir', 'K H P S Jainarkodi is dedicated to providing holistic primary education, fostering critical thinking, moral values, and academic excellence for children from LKG to 7th Standard in a warm, nurturing community environment.', 'Monday – Friday: 9:00 AM – 4:45 PM | Saturday: 8:00 AM – 12:00 PM', 'https://maps.app.goo.gl/CcYsDyy1ZH3STTzs7');
     `);
-  } else {
-    try { await db.run("UPDATE school_information SET logo_url = '/logo.png' WHERE id = 1;"); } catch (e) {}
   }
 
   // 16. Calendar Events

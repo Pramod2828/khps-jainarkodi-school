@@ -1,19 +1,13 @@
-const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-async function migratePostgres(connectionString) {
-  if (!connectionString) return;
-
-  const pool = new Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false }
-  });
+async function migratePostgres(pool) {
+  if (!pool) return;
 
   try {
     console.log('🔄 Checking Cloud PostgreSQL schema and non-destructive data sync...');
 
-    // 1. Create all 18 production tables individually
+    // 1. Create all 18 production tables individually using active pool
     const createTableQueries = [
       `CREATE TABLE IF NOT EXISTS school_information (
         id SERIAL PRIMARY KEY,
@@ -245,7 +239,6 @@ async function migratePostgres(connectionString) {
         await pool.query(q);
       } catch (tableErr) {
         console.error(`Table Query Warning: ${tableErr.message} (Query: ${q.substring(0, 50)})`);
-        lastDbError = `Create Table Error (${tableErr.message})`;
       }
     }
 

@@ -45,11 +45,11 @@ function getPgPool() {
 
 // Ensure schema migration finishes before queries execute
 async function ensurePostgresMigrated() {
-  const url = getPgUrl();
-  if (!url) return;
+  const p = getPgPool();
+  if (!p) return;
   if (!migrationPromise) {
     console.log('🔄 Executing Cloud PostgreSQL non-destructive schema migration...');
-    migrationPromise = migratePostgres(url).catch(e => {
+    migrationPromise = migratePostgres(p).catch(e => {
       console.error('Migration notice:', e.message);
       lastDbError = 'Migration notice: ' + e.message;
     });

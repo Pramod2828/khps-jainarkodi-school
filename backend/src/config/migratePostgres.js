@@ -205,6 +205,11 @@ async function migratePostgres(connectionString) {
             const insertSql = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`;
             await pool.query(insertSql, vals);
           }
+
+          // Reset PostgreSQL SERIAL sequence to max(id) so auto-increment works cleanly
+          try {
+            await pool.query(`SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE((SELECT MAX(id) FROM "${table}"), 1))`);
+          } catch(seqErr) {}
         }
       }
     }

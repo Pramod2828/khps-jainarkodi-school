@@ -3,6 +3,8 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const { executeSqliteQuery, getSqliteDb } = require('./sqliteDb');
 
+const { migratePostgres } = require('./migratePostgres');
+
 let PgPool = null;
 try {
   PgPool = require('pg').Pool;
@@ -23,6 +25,7 @@ if (pgUrl && PgPool) {
       ssl: { rejectUnauthorized: false }
     });
     console.log('🔌 Cloud PostgreSQL configuration detected.');
+    migratePostgres(pgUrl).catch(e => console.error('Migration notice:', e.message));
   } catch (err) {
     console.warn('⚠️ Failed to initialize PostgreSQL pool:', err.message);
   }

@@ -194,7 +194,15 @@ async function testConnection() {
   }
 }
 
+function getDbDriverInfo() {
+  if (useSqlite || process.env.DB_TYPE === 'sqlite') return 'SQLITE_EMBEDDED';
+  if (dbDriver === 'postgres' && pgPool) return 'POSTGRESQL';
+  if (mysqlPool) return 'MYSQL';
+  return 'SQLITE_EMBEDDED';
+}
+
 module.exports = {
   pool,
-  testConnection
+  testConnection,
+  getDbDriverInfo
 };

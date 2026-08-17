@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
-const { testConnection } = require('./config/db');
+const { testConnection, getDbDriverInfo } = require('./config/db');
 const { errorResponse } = require('./utils/apiResponse');
 
 // Import Route Handlers
@@ -60,7 +60,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
@@ -74,11 +74,14 @@ app.use('/uploads', express.static(uploadsDir));
 // Healthcheck Route
 app.get('/api/health', async (req, res) => {
   const dbConnected = await testConnection();
+  const driver = getDbDriverInfo();
   return res.json({
     status: 'online',
     system: 'Government Primary School Jainarkodi REST API',
     timezone: process.env.TIMEZONE || 'Asia/Kolkata',
     database: dbConnected ? 'connected' : 'disconnected',
+    db_driver: driver,
+    is_database_url_configured: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
     timestamp: new Date().toISOString()
   });
 });

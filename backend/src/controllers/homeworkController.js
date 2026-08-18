@@ -5,9 +5,18 @@ const { logAudit } = require('../utils/auditLogger');
 const fs = require('fs');
 const path = require('path');
 
+function sanitizeFileUrl(url, type, id) {
+  if (!url) return null;
+  const str = String(url).trim();
+  if (str.startsWith('data:') || str.length > 300) {
+    return `/api/${type}/${id}/${type === 'homework' ? 'attachment' : type === 'gallery' ? 'image' : type === 'activities' ? 'cover' : 'file'}`;
+  }
+  return str;
+}
+
 /**
  * GET /api/homework
- * Public & Admin list with SQL CASE WHEN optimization & batch attachment query
+ * Public & Admin list with batch attachment query & lightweight URL resolution
  */
 async function getHomeworkList(req, res) {
   try {
@@ -50,14 +59,12 @@ async function getHomeworkList(req, res) {
     const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM homework h WHERE ${whereSql}`, queryParams);
     const total = countRows[0] ? countRows[0].total : 0;
 
-    // SQL CASE WHEN optimization prevents transferring heavy Base64 strings in list API
     const [rows] = await pool.query(
       `SELECT h.id, h.class_id, c.class_name, h.section_id, sec.section_name,
               h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name) as subject_name, sub.subject_code,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time, h.due_date,
               h.teacher_id, COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              CASE WHEN h.attachment_url LIKE 'data:%' THEN CONCAT('/api/homework/', h.id, '/attachment') ELSE h.attachment_url END as attachment_url,
-              h.created_at
+              h.attachment_url, h.created_at
        FROM homework h
        LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN sections sec ON h.section_id = sec.id
@@ -74,9 +81,7 @@ async function getHomeworkList(req, res) {
       const hwIds = rows.map(r => r.id);
       const placeholders = hwIds.map(() => '?').join(',');
       const [allAttachments] = await pool.query(
-        `SELECT id, homework_id,
-                CASE WHEN file_path LIKE 'data:%' THEN CONCAT('/api/homework/', homework_id, '/attachment') ELSE file_path END as file_path,
-                file_name, file_type, file_size
+        `SELECT id, homework_id, file_path, file_name, file_type, file_size
          FROM homework_attachments
          WHERE homework_id IN (${placeholders})`,
         hwIds
@@ -85,17 +90,24 @@ async function getHomeworkList(req, res) {
       const attachmentsMap = {};
       for (const att of allAttachments) {
         if (!attachmentsMap[att.homework_id]) attachmentsMap[att.homework_id] = [];
-        attachmentsMap[att.homework_id].push(att);
+        attachmentsMap[att.homework_id].push({
+          ...att,
+          file_path: sanitizeFileUrl(att.file_path, 'homework', att.homework_id)
+        });
       }
 
       for (const hw of rows) {
         const atts = attachmentsMap[hw.id] || [];
         hw.attachments = atts;
-        if (!hw.attachment_url && atts.length > 0) {
-          hw.attachment_url = atts[0].file_path;
+
+        let cleanUrl = sanitizeFileUrl(hw.attachment_url, 'homework', hw.id);
+        if (!cleanUrl && atts.length > 0) {
+          cleanUrl = atts[0].file_path;
         }
-        hw.file_path = hw.attachment_url;
-        hw.has_attachment = !!(hw.attachment_url || atts.length > 0);
+
+        hw.attachment_url = cleanUrl || null;
+        hw.file_path = cleanUrl || null;
+        hw.has_attachment = !!(cleanUrl || atts.length > 0);
       }
     }
 
@@ -125,8 +137,7 @@ async function getHomeworkById(req, res) {
               COALESCE(h.custom_subject_name, sub.subject_name) as subject_name,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time, h.due_date,
               h.teacher_id, COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              CASE WHEN h.attachment_url LIKE 'data:%' THEN CONCAT('/api/homework/', h.id, '/attachment') ELSE h.attachment_url END as attachment_url,
-              h.created_at, h.updated_at
+              h.attachment_url, h.created_at, h.updated_at
        FROM homework h
        LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN subjects sub ON h.subject_id = sub.id
@@ -141,16 +152,19 @@ async function getHomeworkById(req, res) {
 
     const hw = rows[0];
     const [attachments] = await pool.query(
-      `SELECT id, homework_id,
-              CASE WHEN file_path LIKE 'data:%' THEN CONCAT('/api/homework/', homework_id, '/attachment') ELSE file_path END as file_path,
-              file_name, file_type, file_size
+      `SELECT id, homework_id, file_path, file_name, file_type, file_size
        FROM homework_attachments WHERE homework_id = ?`,
       [id]
     );
 
-    hw.attachments = attachments;
-    if (!hw.attachment_url && attachments.length > 0) {
-      hw.attachment_url = attachments[0].file_path;
+    hw.attachments = attachments.map(att => ({
+      ...att,
+      file_path: sanitizeFileUrl(att.file_path, 'homework', id)
+    }));
+
+    hw.attachment_url = sanitizeFileUrl(hw.attachment_url, 'homework', id);
+    if (!hw.attachment_url && hw.attachments.length > 0) {
+      hw.attachment_url = hw.attachments[0].file_path;
     }
     hw.file_path = hw.attachment_url;
 

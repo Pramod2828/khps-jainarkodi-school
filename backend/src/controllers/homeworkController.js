@@ -16,7 +16,7 @@ function sanitizeUrl(url, type, id) {
 
 /**
  * GET /api/homework
- * Public & Admin list with batch attachment query & lightweight URL resolution
+ * Public & Admin list with batch attachment query & SQL LENGTH optimization
  */
 async function getHomeworkList(req, res) {
   try {
@@ -59,12 +59,14 @@ async function getHomeworkList(req, res) {
     const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM homework h WHERE ${whereSql}`, queryParams);
     const total = countRows[0] ? countRows[0].total : 0;
 
+    // SQL LENGTH optimization bypasses reading megabyte Base64 text columns from PostgreSQL disk
     const [rows] = await pool.query(
       `SELECT h.id, h.class_id, c.class_name, h.section_id, sec.section_name,
               h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name) as subject_name, sub.subject_code,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time, h.due_date,
               h.teacher_id, COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              h.attachment_url, h.created_at
+              CASE WHEN h.attachment_url IS NOT NULL AND LENGTH(h.attachment_url) > 300 THEN CONCAT('/api/homework/', h.id, '/attachment') ELSE h.attachment_url END as attachment_url,
+              h.created_at
        FROM homework h
        LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN sections sec ON h.section_id = sec.id
@@ -76,12 +78,14 @@ async function getHomeworkList(req, res) {
       [...queryParams, limit, offset]
     );
 
-    // FIX 1 & FIX 2: Single Batch Attachment Query with lightweight URL mapping
+    // FIX 1 & FIX 2: Single Batch Attachment Query
     if (rows.length > 0) {
       const hwIds = rows.map(r => r.id);
       const placeholders = hwIds.map(() => '?').join(',');
       const [allAttachments] = await pool.query(
-        `SELECT id, homework_id, file_path, file_name, file_type, file_size
+        `SELECT id, homework_id,
+                CASE WHEN file_path IS NOT NULL AND LENGTH(file_path) > 300 THEN CONCAT('/api/homework/', homework_id, '/attachment') ELSE file_path END as file_path,
+                file_name, file_type, file_size
          FROM homework_attachments
          WHERE homework_id IN (${placeholders})`,
         hwIds
@@ -137,7 +141,8 @@ async function getHomeworkById(req, res) {
               COALESCE(h.custom_subject_name, sub.subject_name) as subject_name,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time, h.due_date,
               h.teacher_id, COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              h.attachment_url, h.created_at, h.updated_at
+              CASE WHEN h.attachment_url IS NOT NULL AND LENGTH(h.attachment_url) > 300 THEN CONCAT('/api/homework/', h.id, '/attachment') ELSE h.attachment_url END as attachment_url,
+              h.created_at, h.updated_at
        FROM homework h
        LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN subjects sub ON h.subject_id = sub.id
@@ -152,7 +157,9 @@ async function getHomeworkById(req, res) {
 
     const hw = rows[0];
     const [attachments] = await pool.query(
-      `SELECT id, homework_id, file_path, file_name, file_type, file_size
+      `SELECT id, homework_id,
+              CASE WHEN file_path IS NOT NULL AND LENGTH(file_path) > 300 THEN CONCAT('/api/homework/', homework_id, '/attachment') ELSE file_path END as file_path,
+              file_name, file_type, file_size
        FROM homework_attachments WHERE homework_id = ?`,
       [id]
     );
@@ -193,11 +200,17 @@ async function getHomeworkAttachmentStream(req, res) {
       return res.status(404).send('Attachment not found');
     }
 
-    if (rawUrl.startsWith('data:')) {
-      const parts = rawUrl.split(',');
-      const mimeMatch = parts[0].match(/:(.*?);/);
-      const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-      const base64Data = parts[1] ? parts[1].replace(/\s/g, '') : '';
+    if (rawUrl.startsWith('data:') || rawUrl.length > 300) {
+      let mime = 'application/octet-stream';
+      let base64Data = rawUrl;
+
+      if (rawUrl.startsWith('data:')) {
+        const parts = rawUrl.split(',');
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        base64Data = parts[1] ? parts[1].replace(/\s/g, '') : '';
+      }
+
       const fileBuffer = Buffer.from(base64Data, 'base64');
       
       let disposition = 'inline';

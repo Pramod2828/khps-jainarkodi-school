@@ -354,6 +354,7 @@ function getDbError() {
 
 module.exports = {
   pool,
+  getConnection: (...args) => pool.getConnection(...args),
   testConnection,
   getDbDriverInfo,
   getDbError

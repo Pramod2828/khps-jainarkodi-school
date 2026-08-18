@@ -1,6 +1,6 @@
 const { pool, getConnection } = require('../config/db');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
-const { calculateDayFromDate } = require('../utils/dateFormatter');
+const { calculateDayFromDate } = require('../utils/dateHelper');
 const { logAudit } = require('../utils/auditLogger');
 const fs = require('fs');
 const path = require('path');

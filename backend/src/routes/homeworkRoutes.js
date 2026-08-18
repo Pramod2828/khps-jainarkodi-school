@@ -7,6 +7,7 @@ const upload = require('../middleware/upload');
 
 // Public GET routes
 router.get('/', homeworkController.getHomeworkList);
+router.get('/:id/attachment', homeworkController.getHomeworkAttachmentStream);
 router.get('/:id', homeworkController.getHomeworkById);
 
 // Protected CUD routes

@@ -6,7 +6,7 @@ const path = require('path');
 
 /**
  * GET /api/downloads
- * Public list of study materials & worksheets
+ * Public list of study materials & worksheets with lightweight file URLs
  */
 async function getDownloads(req, res) {
   try {
@@ -42,10 +42,70 @@ async function getDownloads(req, res) {
       queryParams
     );
 
-    return successResponse(res, rows, 'Downloads retrieved');
+    // FIX 2: Convert Base64 file_url to lightweight proxy stream URL for list API
+    const processedRows = rows.map(d => {
+      let finalUrl = d.file_url || d.file_path;
+      if (finalUrl && finalUrl.startsWith('data:')) {
+        finalUrl = `/api/downloads/${d.id}/file`;
+      }
+      return {
+        ...d,
+        file_url: finalUrl,
+        file_path: finalUrl,
+        has_file: !!(d.file_url || d.file_path)
+      };
+    });
+
+    return successResponse(res, processedRows, 'Downloads retrieved');
   } catch (error) {
     console.error('getDownloads Error:', error);
     return errorResponse(res, 'Failed to fetch download materials', 500, 'SERVER_ERROR', error.message);
+  }
+}
+
+/**
+ * GET /api/downloads/:id/file
+ * Binary streaming endpoint for study material files (PDF, DOCX, images)
+ */
+async function getDownloadFileStream(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT title, file_url, file_path, file_type FROM downloads WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).send('File not found');
+
+    const d = rows[0];
+    const rawUrl = d.file_url || d.file_path;
+    if (!rawUrl) return res.status(404).send('File content not available');
+
+    if (rawUrl.startsWith('data:')) {
+      const parts = rawUrl.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+      const base64Data = parts[1] ? parts[1].replace(/\s/g, '') : '';
+      const fileBuffer = Buffer.from(base64Data, 'base64');
+
+      let disposition = 'inline';
+      if (mime.includes('word') || mime.includes('officedocument') || mime.includes('octet-stream')) {
+        disposition = `attachment; filename="${d.title || 'download'}.${d.file_type || 'docx'}"`;
+      } else if (mime === 'application/pdf') {
+        disposition = `inline; filename="${d.title || 'document'}.pdf"`;
+      }
+
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', disposition);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Content-Length', fileBuffer.length);
+      return res.send(fileBuffer);
+    }
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return res.redirect(rawUrl);
+    }
+
+    return res.redirect(rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`);
+  } catch (error) {
+    console.error('getDownloadFileStream Error:', error);
+    return res.status(500).send('Failed to serve download file');
   }
 }
 
@@ -67,7 +127,6 @@ async function createDownload(req, res) {
     let fileUrl = `/uploads/${req.file.filename}`;
     const ext = path.extname(req.file.originalname).replace('.', '').toLowerCase();
 
-    // Store as Base64 Data URL for 100% persistent storage across Render container redeploys
     try {
       if (fs.existsSync(req.file.path)) {
         const fileBuffer = fs.readFileSync(req.file.path);
@@ -104,7 +163,6 @@ async function createDownload(req, res) {
     else if (Array.isArray(result) && result[0] && result[0].id) downloadId = result[0].id;
     else if (result && result.id) downloadId = result.id;
 
-    // Sync to downloadable_files table for database backward compatibility
     try {
       await pool.query(
         `INSERT INTO downloadable_files (title, description, class_id, file_path, file_size, file_type, category)
@@ -119,89 +177,28 @@ async function createDownload(req, res) {
           category || 'Worksheets'
         ]
       );
-    } catch (syncErr) {}
+    } catch (e) {}
 
     await logAudit({
       userId: uploaderId,
       userName: req.user ? req.user.name : 'Admin',
-      action: 'UPLOAD_DOWNLOAD',
+      action: 'UPLOAD_STUDY_MATERIAL',
       module: 'DOWNLOADS',
-      recordId: downloadId
+      recordId: downloadId,
+      details: `Uploaded study material "${title}"`
     });
 
-    return successResponse(res, { id: downloadId, file_url: fileUrl }, 'Material uploaded successfully', 201);
+    const returnedFileUrl = fileUrl.startsWith('data:') ? `/api/downloads/${downloadId}/file` : fileUrl;
+
+    return successResponse(
+      res,
+      { id: downloadId, title, file_url: returnedFileUrl, file_path: returnedFileUrl },
+      'Material uploaded successfully',
+      201
+    );
   } catch (error) {
     console.error('createDownload Error:', error);
     return errorResponse(res, 'Failed to upload material', 500, 'SERVER_ERROR', error.message);
-  }
-}
-
-/**
- * PUT /api/downloads/:id
- */
-async function updateDownload(req, res) {
-  try {
-    const { id } = req.params;
-    const { title, description, class_id, category } = req.body;
-
-    const [existing] = await pool.query('SELECT * FROM downloads WHERE id = ?', [id]);
-    if (existing.length === 0) {
-      return errorResponse(res, 'Material not found', 404, 'NOT_FOUND');
-    }
-
-    let fileUrl = existing[0].file_url;
-    let fileSize = existing[0].file_size;
-    let fileType = existing[0].file_type;
-
-    if (req.file) {
-      fileUrl = `/uploads/${req.file.filename}`;
-      fileSize = req.file.size;
-      fileType = path.extname(req.file.originalname).replace('.', '').toLowerCase();
-
-      try {
-        if (fs.existsSync(req.file.path)) {
-          const fileBuffer = fs.readFileSync(req.file.path);
-          const base64Str = fileBuffer.toString('base64');
-          const mimeType = req.file.mimetype || 'application/octet-stream';
-          fileUrl = `data:${mimeType};base64,${base64Str}`;
-        }
-      } catch (e) {}
-    }
-
-    await pool.query(
-      `UPDATE downloads SET
-        title = COALESCE(?, title),
-        description = COALESCE(?, description),
-        class_id = ?,
-        category = COALESCE(?, category),
-        file_url = ?,
-        file_size = ?,
-        file_type = ?
-       WHERE id = ?`,
-      [
-        title ? title.trim() : null,
-        description !== undefined ? (description ? description.trim() : null) : existing[0].description,
-        class_id && class_id !== 'all' ? parseInt(class_id) : null,
-        category || null,
-        fileUrl,
-        fileSize,
-        fileType,
-        id
-      ]
-    );
-
-    await logAudit({
-      userId: req.user ? req.user.id : 1,
-      userName: req.user ? req.user.name : 'Admin',
-      action: 'UPDATE_DOWNLOAD',
-      module: 'DOWNLOADS',
-      recordId: id
-    });
-
-    return successResponse(res, null, 'Material updated successfully');
-  } catch (error) {
-    console.error('updateDownload Error:', error);
-    return errorResponse(res, 'Failed to update material', 500, 'SERVER_ERROR', error.message);
   }
 }
 
@@ -211,25 +208,29 @@ async function updateDownload(req, res) {
 async function deleteDownload(req, res) {
   try {
     const { id } = req.params;
+    const [result] = await pool.query('DELETE FROM downloads WHERE id = ?', [id]);
 
-    const [existing] = await pool.query('SELECT file_url FROM downloads WHERE id = ?', [id]);
-    if (existing.length > 0 && existing[0].file_url && !existing[0].file_url.startsWith('data:')) {
-      const fullPath = path.join(__dirname, '../../', existing[0].file_url);
-      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+    if (result.affectedRows === 0) {
+      return errorResponse(res, 'Study material record not found', 404, 'NOT_FOUND');
     }
 
-    await pool.query('DELETE FROM downloads WHERE id = ?', [id]);
+    await logAudit({
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Admin',
+      action: 'DELETE_STUDY_MATERIAL',
+      module: 'DOWNLOADS',
+      recordId: id
+    });
 
-    return successResponse(res, null, 'Material deleted successfully');
+    return successResponse(res, null, 'Study material deleted successfully');
   } catch (error) {
-    console.error('deleteDownload Error:', error);
     return errorResponse(res, 'Failed to delete material', 500, 'SERVER_ERROR', error.message);
   }
 }
 
 module.exports = {
   getDownloads,
+  getDownloadFileStream,
   createDownload,
-  updateDownload,
   deleteDownload
 };

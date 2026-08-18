@@ -1,4 +1,4 @@
-const { pool } = require('../config/db');
+const { pool, getConnection } = require('../config/db');
 const { successResponse, errorResponse } = require('../utils/apiResponse');
 const { logAudit } = require('../utils/auditLogger');
 const fs = require('fs');
@@ -6,7 +6,7 @@ const path = require('path');
 
 /**
  * GET /api/activities
- * Public & Admin activities with pagination
+ * Public & Admin activities with pagination and lightweight list URLs
  */
 async function getActivities(req, res) {
   try {
@@ -15,7 +15,7 @@ async function getActivities(req, res) {
     const offset = (page - 1) * limit;
 
     const [countRows] = await pool.query('SELECT COUNT(*) as total FROM activities');
-    const total = countRows[0].total;
+    const total = countRows[0] ? countRows[0].total : 0;
 
     const [rows] = await pool.query(
       `SELECT a.id, a.title, a.description, a.activity_date, a.cover_image, a.video_url, a.created_by, COALESCE(u.name, 'Teacher') as author_name, a.created_at
@@ -26,22 +26,35 @@ async function getActivities(req, res) {
       [limit, offset]
     );
 
+    // FIX 2: Return proxy streaming URL for heavy Base64 cover images in list payload
+    const processedRows = rows.map(a => {
+      let finalCover = a.cover_image;
+      if (finalCover && finalCover.startsWith('data:')) {
+        finalCover = `/api/activities/${a.id}/cover`;
+      }
+      return {
+        ...a,
+        cover_image: finalCover,
+        has_cover: !!a.cover_image
+      };
+    });
+
     const totalPages = Math.ceil(total / limit);
 
-    return successResponse(res, rows, 'Activities retrieved', 200, {
+    return successResponse(res, processedRows, 'Activities retrieved', 200, {
       page,
       limit,
       total,
       totalPages
     });
   } catch (error) {
+    console.error('getActivities Error:', error);
     return errorResponse(res, 'Failed to fetch activities', 500, 'SERVER_ERROR', error.message);
   }
 }
 
 /**
  * GET /api/activities/:id
- * Detailed activity view with multi-image gallery
  */
 async function getActivityById(req, res) {
   try {
@@ -59,11 +72,16 @@ async function getActivityById(req, res) {
       return errorResponse(res, 'Activity not found', 404, 'NOT_FOUND');
     }
 
-    const activity = rows[0];
+    const activity = { ...rows[0] };
+    if (activity.cover_image && activity.cover_image.startsWith('data:')) {
+      activity.cover_image = `/api/activities/${id}/cover`;
+    }
 
-    // Fetch additional gallery images for this activity
     const [images] = await pool.query('SELECT id, image_url FROM activity_images WHERE activity_id = ?', [id]);
-    activity.images = images;
+    activity.images = images.map(img => ({
+      ...img,
+      image_url: img.image_url && img.image_url.startsWith('data:') ? `/api/activities/${id}/image/${img.id}` : img.image_url
+    }));
 
     return successResponse(res, activity, 'Activity details retrieved');
   } catch (error) {
@@ -72,24 +90,59 @@ async function getActivityById(req, res) {
 }
 
 /**
+ * GET /api/activities/:id/cover
+ * Binary streaming endpoint for activity cover image
+ */
+async function getActivityCoverStream(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT cover_image FROM activities WHERE id = ?', [id]);
+    if (rows.length === 0 || !rows[0].cover_image) {
+      return res.status(404).send('Cover image not found');
+    }
+
+    const rawUrl = rows[0].cover_image;
+    if (rawUrl.startsWith('data:')) {
+      const parts = rawUrl.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const base64Data = parts[1] ? parts[1].replace(/\s/g, '') : '';
+      const imgBuffer = Buffer.from(base64Data, 'base64');
+      
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Content-Length', imgBuffer.length);
+      return res.send(imgBuffer);
+    }
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return res.redirect(rawUrl);
+    }
+
+    return res.redirect(rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`);
+  } catch (error) {
+    console.error('getActivityCoverStream Error:', error);
+    return res.status(500).send('Failed to serve cover image');
+  }
+}
+
+/**
  * POST /api/activities
- * Protected: Teacher / Admin
  */
 async function createActivity(req, res) {
-  const connection = await pool.getConnection();
+  const connection = await getConnection();
   try {
     await connection.beginTransaction();
 
     const { title, description, activity_date, video_url } = req.body;
 
     if (!title || !description || !activity_date) {
-      return errorResponse(res, 'Title, description and activity date are required.', 400, 'VALIDATION_ERROR');
+      return errorResponse(res, 'Title, description, and activity date are required.', 400, 'VALIDATION_ERROR');
     }
 
     let coverImage = null;
-
-    // Handle files uploaded via multer fields or array
     let rawCoverFile = null;
+
     if (req.files) {
       if (req.files['cover_image'] && req.files['cover_image'][0]) {
         rawCoverFile = req.files['cover_image'][0];
@@ -118,7 +171,6 @@ async function createActivity(req, res) {
 
     const activityId = result.insertId;
 
-    // Additional gallery images for activity
     if (req.files && req.files['gallery_images']) {
       for (const file of req.files['gallery_images']) {
         let imgUrl = `/uploads/${file.filename}`;
@@ -141,18 +193,21 @@ async function createActivity(req, res) {
     await connection.commit();
 
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
-      action: 'UPLOAD_ACTIVITY',
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Teacher',
+      action: 'CREATE_ACTIVITY',
       module: 'ACTIVITIES',
       recordId: activityId,
       details: `Created activity "${title}"`
     });
 
-    return successResponse(res, { id: activityId, title }, 'Activity created successfully', 201);
+    const returnedCover = coverImage && coverImage.startsWith('data:') ? `/api/activities/${activityId}/cover` : coverImage;
+
+    return successResponse(res, { id: activityId, title, cover_image: returnedCover }, 'Activity event created successfully', 201);
   } catch (error) {
     await connection.rollback();
-    return errorResponse(res, 'Failed to create activity', 500, 'SERVER_ERROR', error.message);
+    console.error('createActivity Error:', error);
+    return errorResponse(res, 'Failed to create activity record', 500, 'SERVER_ERROR', error.message);
   } finally {
     connection.release();
   }
@@ -164,27 +219,16 @@ async function createActivity(req, res) {
 async function deleteActivity(req, res) {
   try {
     const { id } = req.params;
-
-    const [images] = await pool.query('SELECT image_url FROM activity_images WHERE activity_id = ?', [id]);
-    for (const img of images) {
-      const fullPath = path.join(__dirname, '../../', img.image_url);
-      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-    }
-
-    const [activity] = await pool.query('SELECT cover_image FROM activities WHERE id = ?', [id]);
-    if (activity.length > 0 && activity[0].cover_image) {
-      const fullPath = path.join(__dirname, '../../', activity[0].cover_image);
-      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-    }
-
+    await pool.query('DELETE FROM activity_images WHERE activity_id = ?', [id]);
     const [result] = await pool.query('DELETE FROM activities WHERE id = ?', [id]);
+
     if (result.affectedRows === 0) {
       return errorResponse(res, 'Activity not found', 404, 'NOT_FOUND');
     }
 
     await logAudit({
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Teacher',
       action: 'DELETE_ACTIVITY',
       module: 'ACTIVITIES',
       recordId: id
@@ -199,6 +243,7 @@ async function deleteActivity(req, res) {
 module.exports = {
   getActivities,
   getActivityById,
+  getActivityCoverStream,
   createActivity,
   deleteActivity
 };

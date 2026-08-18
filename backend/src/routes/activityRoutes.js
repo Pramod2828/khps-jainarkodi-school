@@ -6,6 +6,7 @@ const { requireTeacherOrAdmin } = require('../middleware/roleCheck');
 const upload = require('../middleware/upload');
 
 router.get('/', activitiesController.getActivities);
+router.get('/:id/cover', activitiesController.getActivityCoverStream);
 router.get('/:id', activitiesController.getActivityById);
 
 router.post(

@@ -7,13 +7,14 @@ const upload = require('../middleware/upload');
 
 router.get('/categories', galleryController.getCategories);
 router.get('/', galleryController.getGallery);
+router.get('/:id/image', galleryController.getGalleryImageStream);
 
 router.post(
   '/', 
   verifyToken, 
   requireTeacherOrAdmin, 
-  upload.any(), 
-  galleryController.uploadGalleryPhoto
+  upload.single('image'), 
+  galleryController.createGalleryPhoto
 );
 router.delete('/:id', verifyToken, requireTeacherOrAdmin, galleryController.deleteGalleryPhoto);
 

@@ -18,7 +18,7 @@ async function getCategories(req, res) {
 
 /**
  * GET /api/gallery
- * Public & Admin gallery photos with pagination & category filter
+ * Public & Admin gallery photos with pagination & lightweight streaming URLs
  */
 async function getGallery(req, res) {
   try {
@@ -50,28 +50,77 @@ async function getGallery(req, res) {
       [...queryParams, limit, offset]
     );
 
+    // FIX 2: Convert Base64 image_url to lightweight proxy stream URL for list API
+    const processedRows = rows.map(g => {
+      let finalImg = g.image_url;
+      if (finalImg && finalImg.startsWith('data:')) {
+        finalImg = `/api/gallery/${g.id}/image`;
+      }
+      return {
+        ...g,
+        image_url: finalImg,
+        has_image: !!g.image_url
+      };
+    });
+
     const totalPages = Math.ceil(total / limit);
 
-    return successResponse(res, rows, 'Gallery photos retrieved', 200, {
+    return successResponse(res, processedRows, 'Gallery photos retrieved', 200, {
       page,
       limit,
       total,
       totalPages
     });
   } catch (error) {
+    console.error('getGallery Error:', error);
     return errorResponse(res, 'Failed to fetch gallery photos', 500, 'SERVER_ERROR', error.message);
   }
 }
 
 /**
- * POST /api/gallery
- * Protected: Teacher / Admin
+ * GET /api/gallery/:id/image
+ * Binary streaming endpoint for gallery images
  */
-async function uploadGalleryPhoto(req, res) {
+async function getGalleryImageStream(req, res) {
   try {
-    const { title, description, category_id } = req.body;
+    const { id } = req.params;
+    const [rows] = await pool.query('SELECT image_url FROM gallery WHERE id = ?', [id]);
+    if (rows.length === 0 || !rows[0].image_url) {
+      return res.status(404).send('Image not found');
+    }
 
-    const file = req.file || (Array.isArray(req.files) && req.files.length > 0 ? req.files[0] : (req.files && (req.files.photo?.[0] || req.files.image?.[0])));
+    const rawUrl = rows[0].image_url;
+    if (rawUrl.startsWith('data:')) {
+      const parts = rawUrl.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const base64Data = parts[1] ? parts[1].replace(/\s/g, '') : '';
+      const imgBuffer = Buffer.from(base64Data, 'base64');
+      
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Content-Length', imgBuffer.length);
+      return res.send(imgBuffer);
+    }
+
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return res.redirect(rawUrl);
+    }
+
+    return res.redirect(rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`);
+  } catch (error) {
+    console.error('getGalleryImageStream Error:', error);
+    return res.status(500).send('Failed to serve gallery image');
+  }
+}
+
+/**
+ * POST /api/gallery
+ */
+async function createGalleryPhoto(req, res) {
+  try {
+    const file = req.file;
+    const { title, description, category_id } = req.body;
 
     if (!file) {
       return errorResponse(res, 'An image file is required for gallery upload.', 400, 'VALIDATION_ERROR');
@@ -81,13 +130,11 @@ async function uploadGalleryPhoto(req, res) {
       return errorResponse(res, 'Category is required.', 400, 'VALIDATION_ERROR');
     }
 
-    // Check size limit: 5MB for images
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > 10 * 1024 * 1024) {
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-      return errorResponse(res, 'Image file size must not exceed 5 MB.', 400, 'FILE_TOO_LARGE');
+      return errorResponse(res, 'Image file size must not exceed 10 MB.', 400, 'FILE_TOO_LARGE');
     }
 
-    // Convert uploaded image to Data URL for permanent zero-loss storage across deployments
     let imageUrl = `/uploads/${file.filename}`;
     try {
       if (fs.existsSync(file.path)) {
@@ -97,7 +144,7 @@ async function uploadGalleryPhoto(req, res) {
         imageUrl = `data:${mimeType};base64,${base64Str}`;
       }
     } catch (e) {
-      console.warn('⚠️ Could not convert image to base64, falling back to upload path:', e.message);
+      console.warn('⚠️ Could not convert image to base64:', e.message);
     }
 
     const userId = req.user ? req.user.id : 1;
@@ -108,16 +155,20 @@ async function uploadGalleryPhoto(req, res) {
       [title ? title.trim() : 'School Photo', description ? description.trim() : null, parseInt(category_id), imageUrl, userId]
     );
 
+    const insertedId = result.insertId;
+
     await logAudit({
       userId: userId,
       userName: req.user ? req.user.name : 'Admin',
       action: 'UPLOAD_GALLERY',
       module: 'GALLERY',
-      recordId: result.insertId,
+      recordId: insertedId,
       details: `Uploaded gallery photo "${title || 'School Photo'}"`
     });
 
-    return successResponse(res, { id: result.insertId, image_url: imageUrl }, 'Photo uploaded successfully', 201);
+    const returnedUrl = imageUrl.startsWith('data:') ? `/api/gallery/${insertedId}/image` : imageUrl;
+
+    return successResponse(res, { id: insertedId, image_url: returnedUrl }, 'Photo uploaded successfully', 201);
   } catch (error) {
     console.error('uploadGalleryPhoto error:', error);
     return errorResponse(res, 'Failed to upload photo', 500, 'SERVER_ERROR', error.message);
@@ -130,18 +181,11 @@ async function uploadGalleryPhoto(req, res) {
 async function deleteGalleryPhoto(req, res) {
   try {
     const { id } = req.params;
+    const [result] = await pool.query('DELETE FROM gallery WHERE id = ?', [id]);
 
-    const [existing] = await pool.query('SELECT image_url FROM gallery WHERE id = ?', [id]);
-    if (existing.length === 0) {
+    if (result.affectedRows === 0) {
       return errorResponse(res, 'Photo not found', 404, 'NOT_FOUND');
     }
-
-    if (existing[0].image_url && !existing[0].image_url.startsWith('data:')) {
-      const fullPath = path.join(__dirname, '../../', existing[0].image_url);
-      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-    }
-
-    await pool.query('DELETE FROM gallery WHERE id = ?', [id]);
 
     await logAudit({
       userId: req.user ? req.user.id : 1,
@@ -160,6 +204,7 @@ async function deleteGalleryPhoto(req, res) {
 module.exports = {
   getCategories,
   getGallery,
-  uploadGalleryPhoto,
+  getGalleryImageStream,
+  createGalleryPhoto,
   deleteGalleryPhoto
 };

@@ -18,7 +18,7 @@ async function getCategories(req, res) {
 
 /**
  * GET /api/gallery
- * Public & Admin gallery photos with pagination & lightweight streaming URLs
+ * Public & Admin gallery photos with SQL CASE WHEN optimization
  */
 async function getGallery(req, res) {
   try {
@@ -39,8 +39,11 @@ async function getGallery(req, res) {
     const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM gallery g WHERE ${whereSql}`, queryParams);
     const total = countRows[0] ? countRows[0].total : 0;
 
+    // SQL CASE WHEN optimization prevents transferring heavy Base64 image_url from PostgreSQL disk
     const [rows] = await pool.query(
-      `SELECT g.id, g.title, g.description, g.category_id, COALESCE(gc.category_name, 'General') as category_name, g.image_url, g.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, g.created_at
+      `SELECT g.id, g.title, g.description, g.category_id, COALESCE(gc.category_name, 'General') as category_name,
+              CASE WHEN g.image_url LIKE 'data:%' THEN CONCAT('/api/gallery/', g.id, '/image') ELSE g.image_url END as image_url,
+              g.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, g.created_at
        FROM gallery g
        LEFT JOIN gallery_categories gc ON g.category_id = gc.id
        LEFT JOIN users u ON g.uploaded_by = u.id
@@ -50,18 +53,10 @@ async function getGallery(req, res) {
       [...queryParams, limit, offset]
     );
 
-    // FIX 2: Convert Base64 image_url to lightweight proxy stream URL for list API
-    const processedRows = rows.map(g => {
-      let finalImg = g.image_url;
-      if (finalImg && finalImg.startsWith('data:')) {
-        finalImg = `/api/gallery/${g.id}/image`;
-      }
-      return {
-        ...g,
-        image_url: finalImg,
-        has_image: !!g.image_url
-      };
-    });
+    const processedRows = rows.map(g => ({
+      ...g,
+      has_image: !!g.image_url
+    }));
 
     const totalPages = Math.ceil(total / limit);
 
@@ -166,7 +161,7 @@ async function createGalleryPhoto(req, res) {
       details: `Uploaded gallery photo "${title || 'School Photo'}"`
     });
 
-    const returnedUrl = imageUrl.startsWith('data:') ? `/api/gallery/${insertedId}/image` : imageUrl;
+    const returnedUrl = `/api/gallery/${insertedId}/image`;
 
     return successResponse(res, { id: insertedId, image_url: returnedUrl }, 'Photo uploaded successfully', 201);
   } catch (error) {

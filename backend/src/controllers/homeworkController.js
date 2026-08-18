@@ -5,7 +5,7 @@ const { logAudit } = require('../utils/auditLogger');
 const fs = require('fs');
 const path = require('path');
 
-function sanitizeFileUrl(url, type, id) {
+function sanitizeUrl(url, type, id) {
   if (!url) return null;
   const str = String(url).trim();
   if (str.startsWith('data:') || str.length > 300) {
@@ -76,7 +76,7 @@ async function getHomeworkList(req, res) {
       [...queryParams, limit, offset]
     );
 
-    // FIX 1 & FIX 2: Optimized Single Batch Attachment Query
+    // FIX 1 & FIX 2: Single Batch Attachment Query with lightweight URL mapping
     if (rows.length > 0) {
       const hwIds = rows.map(r => r.id);
       const placeholders = hwIds.map(() => '?').join(',');
@@ -92,7 +92,7 @@ async function getHomeworkList(req, res) {
         if (!attachmentsMap[att.homework_id]) attachmentsMap[att.homework_id] = [];
         attachmentsMap[att.homework_id].push({
           ...att,
-          file_path: sanitizeFileUrl(att.file_path, 'homework', att.homework_id)
+          file_path: sanitizeUrl(att.file_path, 'homework', att.homework_id)
         });
       }
 
@@ -100,7 +100,7 @@ async function getHomeworkList(req, res) {
         const atts = attachmentsMap[hw.id] || [];
         hw.attachments = atts;
 
-        let cleanUrl = sanitizeFileUrl(hw.attachment_url, 'homework', hw.id);
+        let cleanUrl = sanitizeUrl(hw.attachment_url, 'homework', hw.id);
         if (!cleanUrl && atts.length > 0) {
           cleanUrl = atts[0].file_path;
         }
@@ -159,10 +159,10 @@ async function getHomeworkById(req, res) {
 
     hw.attachments = attachments.map(att => ({
       ...att,
-      file_path: sanitizeFileUrl(att.file_path, 'homework', id)
+      file_path: sanitizeUrl(att.file_path, 'homework', id)
     }));
 
-    hw.attachment_url = sanitizeFileUrl(hw.attachment_url, 'homework', id);
+    hw.attachment_url = sanitizeUrl(hw.attachment_url, 'homework', id);
     if (!hw.attachment_url && hw.attachments.length > 0) {
       hw.attachment_url = hw.attachments[0].file_path;
     }

@@ -233,9 +233,88 @@ async function deleteDownload(req, res) {
   }
 }
 
+/**
+ * PUT /api/downloads/:id
+ */
+async function updateDownload(req, res) {
+  try {
+    const { id } = req.params;
+    const { title, description, class_id, category } = req.body;
+
+    const [existing] = await pool.query('SELECT * FROM downloads WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return errorResponse(res, 'Study material record not found', 404, 'NOT_FOUND');
+    }
+
+    const current = existing[0];
+    let fileUrl = current.file_url || current.file_path;
+    let fileSize = current.file_size;
+    let fileType = current.file_type;
+
+    if (req.file) {
+      fileUrl = `/uploads/${req.file.filename}`;
+      fileSize = req.file.size;
+      fileType = path.extname(req.file.originalname).replace('.', '').toLowerCase();
+
+      try {
+        if (fs.existsSync(req.file.path)) {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          const base64Str = fileBuffer.toString('base64');
+          const mimeType = req.file.mimetype || 'application/octet-stream';
+          fileUrl = `data:${mimeType};base64,${base64Str}`;
+        }
+      } catch (e) {
+        console.warn('File buffer conversion warning:', e.message);
+      }
+    }
+
+    const finalTitle = title ? title.trim() : current.title;
+    const finalDesc = description !== undefined ? (description ? description.trim() : null) : current.description;
+    const finalClassId = class_id && class_id !== 'all' ? parseInt(class_id) : (class_id === 'all' ? null : current.class_id);
+    const finalCategory = category || current.category || 'Worksheets';
+
+    await pool.query(
+      `UPDATE downloads
+       SET title = ?, description = ?, class_id = ?, category = ?, file_url = ?, file_path = ?, file_size = ?, file_type = ?
+       WHERE id = ?`,
+      [finalTitle, finalDesc, finalClassId, finalCategory, fileUrl, fileUrl, fileSize, fileType, id]
+    );
+
+    try {
+      await pool.query(
+        `UPDATE downloadable_files
+         SET title = ?, description = ?, class_id = ?, category = ?, file_path = ?, file_size = ?, file_type = ?
+         WHERE title = ? OR id = ?`,
+        [finalTitle, finalDesc, finalClassId, finalCategory, fileUrl, fileSize, fileType, current.title, id]
+      );
+    } catch (e) {}
+
+    await logAudit({
+      userId: req.user ? req.user.id : 1,
+      userName: req.user ? req.user.name : 'Admin',
+      action: 'UPDATE_STUDY_MATERIAL',
+      module: 'DOWNLOADS',
+      recordId: id,
+      details: `Updated study material "${finalTitle}"`
+    });
+
+    const returnedFileUrl = `/api/downloads/${id}/file`;
+
+    return successResponse(
+      res,
+      { id: parseInt(id), title: finalTitle, description: finalDesc, class_id: finalClassId, category: finalCategory, file_url: returnedFileUrl, file_path: returnedFileUrl },
+      'Study material updated successfully'
+    );
+  } catch (error) {
+    console.error('updateDownload Error:', error);
+    return errorResponse(res, 'Failed to update study material', 500, 'SERVER_ERROR', error.message);
+  }
+}
+
 module.exports = {
   getDownloads,
   getDownloadFileStream,
   createDownload,
+  updateDownload,
   deleteDownload
 };

@@ -4,9 +4,18 @@ const { logAudit } = require('../utils/auditLogger');
 const fs = require('fs');
 const path = require('path');
 
+function sanitizeUrl(url, type, id) {
+  if (!url) return null;
+  const str = String(url).trim();
+  if (str.startsWith('data:') || str.length > 300) {
+    return `/api/${type}/${id}/${type === 'activities' ? 'cover' : 'file'}`;
+  }
+  return str;
+}
+
 /**
  * GET /api/activities
- * Public & Admin activities with SQL CASE WHEN optimization
+ * Public & Admin activities with pagination and lightweight list URLs
  */
 async function getActivities(req, res) {
   try {
@@ -17,11 +26,8 @@ async function getActivities(req, res) {
     const [countRows] = await pool.query('SELECT COUNT(*) as total FROM activities');
     const total = countRows[0] ? countRows[0].total : 0;
 
-    // SQL CASE WHEN optimization prevents transferring 1MB Base64 cover_image from PostgreSQL disk
     const [rows] = await pool.query(
-      `SELECT a.id, a.title, a.description, a.activity_date,
-              CASE WHEN a.cover_image LIKE 'data:%' THEN CONCAT('/api/activities/', a.id, '/cover') ELSE a.cover_image END as cover_image,
-              a.video_url, a.created_by, COALESCE(u.name, 'Teacher') as author_name, a.created_at
+      `SELECT a.id, a.title, a.description, a.activity_date, a.cover_image, a.video_url, a.created_by, COALESCE(u.name, 'Teacher') as author_name, a.created_at
        FROM activities a
        LEFT JOIN users u ON a.created_by = u.id
        ORDER BY a.activity_date DESC, a.created_at DESC
@@ -29,10 +35,14 @@ async function getActivities(req, res) {
       [limit, offset]
     );
 
-    const processedRows = rows.map(a => ({
-      ...a,
-      has_cover: !!a.cover_image
-    }));
+    const processedRows = rows.map(a => {
+      const cleanCover = sanitizeUrl(a.cover_image, 'activities', a.id);
+      return {
+        ...a,
+        cover_image: cleanCover,
+        has_cover: !!cleanCover
+      };
+    });
 
     const totalPages = Math.ceil(total / limit);
 
@@ -56,9 +66,7 @@ async function getActivityById(req, res) {
     const { id } = req.params;
 
     const [rows] = await pool.query(
-      `SELECT a.id, a.title, a.description, a.activity_date,
-              CASE WHEN a.cover_image LIKE 'data:%' THEN CONCAT('/api/activities/', a.id, '/cover') ELSE a.cover_image END as cover_image,
-              a.video_url, a.created_by, COALESCE(u.name, 'Teacher') as author_name, a.created_at
+      `SELECT a.id, a.title, a.description, a.activity_date, a.cover_image, a.video_url, a.created_by, COALESCE(u.name, 'Teacher') as author_name, a.created_at
        FROM activities a
        LEFT JOIN users u ON a.created_by = u.id
        WHERE a.id = ?`,
@@ -70,10 +78,12 @@ async function getActivityById(req, res) {
     }
 
     const activity = { ...rows[0] };
+    activity.cover_image = sanitizeUrl(activity.cover_image, 'activities', id);
+
     const [images] = await pool.query('SELECT id, image_url FROM activity_images WHERE activity_id = ?', [id]);
     activity.images = images.map(img => ({
       ...img,
-      image_url: img.image_url && img.image_url.startsWith('data:') ? `/api/activities/${id}/image/${img.id}` : img.image_url
+      image_url: sanitizeUrl(img.image_url, 'activities', id)
     }));
 
     return successResponse(res, activity, 'Activity details retrieved');

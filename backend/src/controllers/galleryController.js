@@ -4,6 +4,15 @@ const { logAudit } = require('../utils/auditLogger');
 const fs = require('fs');
 const path = require('path');
 
+function sanitizeUrl(url, type, id) {
+  if (!url) return null;
+  const str = String(url).trim();
+  if (str.startsWith('data:') || str.length > 300) {
+    return `/api/${type}/${id}/${type === 'gallery' ? 'image' : 'file'}`;
+  }
+  return str;
+}
+
 /**
  * GET /api/gallery/categories
  */
@@ -18,7 +27,7 @@ async function getCategories(req, res) {
 
 /**
  * GET /api/gallery
- * Public & Admin gallery photos with SQL CASE WHEN optimization
+ * Public & Admin gallery photos with pagination & lightweight URL resolution
  */
 async function getGallery(req, res) {
   try {
@@ -39,11 +48,9 @@ async function getGallery(req, res) {
     const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM gallery g WHERE ${whereSql}`, queryParams);
     const total = countRows[0] ? countRows[0].total : 0;
 
-    // SQL CASE WHEN optimization prevents transferring heavy Base64 image_url from PostgreSQL disk
     const [rows] = await pool.query(
       `SELECT g.id, g.title, g.description, g.category_id, COALESCE(gc.category_name, 'General') as category_name,
-              CASE WHEN g.image_url LIKE 'data:%' THEN CONCAT('/api/gallery/', g.id, '/image') ELSE g.image_url END as image_url,
-              g.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, g.created_at
+              g.image_url, g.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, g.created_at
        FROM gallery g
        LEFT JOIN gallery_categories gc ON g.category_id = gc.id
        LEFT JOIN users u ON g.uploaded_by = u.id
@@ -53,10 +60,14 @@ async function getGallery(req, res) {
       [...queryParams, limit, offset]
     );
 
-    const processedRows = rows.map(g => ({
-      ...g,
-      has_image: !!g.image_url
-    }));
+    const processedRows = rows.map(g => {
+      const cleanImg = sanitizeUrl(g.image_url, 'gallery', g.id);
+      return {
+        ...g,
+        image_url: cleanImg,
+        has_image: !!cleanImg
+      };
+    });
 
     const totalPages = Math.ceil(total / limit);
 

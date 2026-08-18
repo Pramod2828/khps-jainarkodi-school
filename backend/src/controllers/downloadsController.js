@@ -4,6 +4,15 @@ const { logAudit } = require('../utils/auditLogger');
 const fs = require('fs');
 const path = require('path');
 
+function sanitizeUrl(url, type, id) {
+  if (!url) return null;
+  const str = String(url).trim();
+  if (str.startsWith('data:') || str.length > 300) {
+    return `/api/${type}/${id}/file`;
+  }
+  return str;
+}
+
 /**
  * GET /api/downloads
  * Public list of study materials & worksheets with lightweight file URLs
@@ -33,7 +42,7 @@ async function getDownloads(req, res) {
 
     const [rows] = await pool.query(
       `SELECT d.id, d.title, d.description, d.class_id, c.class_name, d.category,
-              COALESCE(d.file_url, d.file_path) as file_url, COALESCE(d.file_path, d.file_url) as file_path, d.file_size, d.file_type, d.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, d.created_at
+              d.file_url, d.file_path, d.file_size, d.file_type, d.uploaded_by, COALESCE(u.name, 'Admin') as uploader_name, d.created_at
        FROM downloads d
        LEFT JOIN classes c ON d.class_id = c.id
        LEFT JOIN users u ON d.uploaded_by = u.id
@@ -42,17 +51,13 @@ async function getDownloads(req, res) {
       queryParams
     );
 
-    // FIX 2: Convert Base64 file_url to lightweight proxy stream URL for list API
     const processedRows = rows.map(d => {
-      let finalUrl = d.file_url || d.file_path;
-      if (finalUrl && finalUrl.startsWith('data:')) {
-        finalUrl = `/api/downloads/${d.id}/file`;
-      }
+      const cleanUrl = sanitizeUrl(d.file_url || d.file_path, 'downloads', d.id);
       return {
         ...d,
-        file_url: finalUrl,
-        file_path: finalUrl,
-        has_file: !!(d.file_url || d.file_path)
+        file_url: cleanUrl,
+        file_path: cleanUrl,
+        has_file: !!cleanUrl
       };
     });
 
@@ -65,7 +70,7 @@ async function getDownloads(req, res) {
 
 /**
  * GET /api/downloads/:id/file
- * Binary streaming endpoint for study material files (PDF, DOCX, images)
+ * Binary streaming endpoint for study material files
  */
 async function getDownloadFileStream(req, res) {
   try {
@@ -188,7 +193,7 @@ async function createDownload(req, res) {
       details: `Uploaded study material "${title}"`
     });
 
-    const returnedFileUrl = fileUrl.startsWith('data:') ? `/api/downloads/${downloadId}/file` : fileUrl;
+    const returnedFileUrl = `/api/downloads/${downloadId}/file`;
 
     return successResponse(
       res,

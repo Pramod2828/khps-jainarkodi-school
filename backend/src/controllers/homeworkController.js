@@ -16,7 +16,7 @@ function sanitizeUrl(url, type, id) {
 
 /**
  * GET /api/homework
- * Public & Admin list with batch attachment query & SQL LENGTH optimization
+ * Public & Admin list with batch attachment query & lightweight URL resolution
  */
 async function getHomeworkList(req, res) {
   try {
@@ -59,14 +59,12 @@ async function getHomeworkList(req, res) {
     const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM homework h WHERE ${whereSql}`, queryParams);
     const total = countRows[0] ? countRows[0].total : 0;
 
-    // SQL LENGTH optimization bypasses reading megabyte Base64 text columns from PostgreSQL disk
     const [rows] = await pool.query(
       `SELECT h.id, h.class_id, c.class_name, h.section_id, sec.section_name,
               h.subject_id, COALESCE(h.custom_subject_name, sub.subject_name) as subject_name, sub.subject_code,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time, h.due_date,
               h.teacher_id, COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              CASE WHEN h.attachment_url IS NOT NULL AND LENGTH(h.attachment_url) > 300 THEN CONCAT('/api/homework/', h.id, '/attachment') ELSE h.attachment_url END as attachment_url,
-              h.created_at
+              h.attachment_url, h.created_at
        FROM homework h
        LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN sections sec ON h.section_id = sec.id
@@ -78,46 +76,48 @@ async function getHomeworkList(req, res) {
       [...queryParams, limit, offset]
     );
 
-    // FIX 1 & FIX 2: Single Batch Attachment Query
+    let attachmentsMap = {};
     if (rows.length > 0) {
-      const hwIds = rows.map(r => r.id);
-      const placeholders = hwIds.map(() => '?').join(',');
-      const [allAttachments] = await pool.query(
-        `SELECT id, homework_id,
-                CASE WHEN file_path IS NOT NULL AND LENGTH(file_path) > 300 THEN CONCAT('/api/homework/', homework_id, '/attachment') ELSE file_path END as file_path,
-                file_name, file_type, file_size
-         FROM homework_attachments
-         WHERE homework_id IN (${placeholders})`,
-        hwIds
-      );
+      try {
+        const hwIds = rows.map(r => r.id);
+        const placeholders = hwIds.map(() => '?').join(',');
+        const [allAttachments] = await pool.query(
+          `SELECT id, homework_id, file_path, file_name, file_type, file_size
+           FROM homework_attachments
+           WHERE homework_id IN (${placeholders})`,
+          hwIds
+        );
 
-      const attachmentsMap = {};
-      for (const att of allAttachments) {
-        if (!attachmentsMap[att.homework_id]) attachmentsMap[att.homework_id] = [];
-        attachmentsMap[att.homework_id].push({
-          ...att,
-          file_path: sanitizeUrl(att.file_path, 'homework', att.homework_id)
-        });
-      }
-
-      for (const hw of rows) {
-        const atts = attachmentsMap[hw.id] || [];
-        hw.attachments = atts;
-
-        let cleanUrl = sanitizeUrl(hw.attachment_url, 'homework', hw.id);
-        if (!cleanUrl && atts.length > 0) {
-          cleanUrl = atts[0].file_path;
+        for (const att of allAttachments) {
+          if (!attachmentsMap[att.homework_id]) attachmentsMap[att.homework_id] = [];
+          attachmentsMap[att.homework_id].push({
+            ...att,
+            file_path: sanitizeUrl(att.file_path, 'homework', att.homework_id)
+          });
         }
-
-        hw.attachment_url = cleanUrl || null;
-        hw.file_path = cleanUrl || null;
-        hw.has_attachment = !!(cleanUrl || atts.length > 0);
+      } catch (e) {
+        console.warn('Batch attachments error:', e.message);
       }
     }
 
+    const processedRows = rows.map(hw => {
+      const atts = attachmentsMap[hw.id] || [];
+      let cleanUrl = sanitizeUrl(hw.attachment_url, 'homework', hw.id);
+      if (!cleanUrl && atts.length > 0) {
+        cleanUrl = atts[0].file_path;
+      }
+      return {
+        ...hw,
+        attachments: atts,
+        attachment_url: cleanUrl,
+        file_path: cleanUrl,
+        has_attachment: !!(cleanUrl || atts.length > 0)
+      };
+    });
+
     const totalPages = Math.ceil(total / limit);
 
-    return successResponse(res, rows, 'Homework list retrieved successfully', 200, {
+    return successResponse(res, processedRows, 'Homework list retrieved successfully', 200, {
       page,
       limit,
       total,
@@ -141,8 +141,7 @@ async function getHomeworkById(req, res) {
               COALESCE(h.custom_subject_name, sub.subject_name) as subject_name,
               h.title, h.description, h.homework_date, h.homework_day, h.homework_time, h.due_date,
               h.teacher_id, COALESCE(h.custom_teacher_name, u.name, 'Teacher') as teacher_name,
-              CASE WHEN h.attachment_url IS NOT NULL AND LENGTH(h.attachment_url) > 300 THEN CONCAT('/api/homework/', h.id, '/attachment') ELSE h.attachment_url END as attachment_url,
-              h.created_at, h.updated_at
+              h.attachment_url, h.created_at, h.updated_at
        FROM homework h
        LEFT JOIN classes c ON h.class_id = c.id
        LEFT JOIN subjects sub ON h.subject_id = sub.id
@@ -156,13 +155,15 @@ async function getHomeworkById(req, res) {
     }
 
     const hw = rows[0];
-    const [attachments] = await pool.query(
-      `SELECT id, homework_id,
-              CASE WHEN file_path IS NOT NULL AND LENGTH(file_path) > 300 THEN CONCAT('/api/homework/', homework_id, '/attachment') ELSE file_path END as file_path,
-              file_name, file_type, file_size
-       FROM homework_attachments WHERE homework_id = ?`,
-      [id]
-    );
+    let attachments = [];
+    try {
+      const [atts] = await pool.query(
+        `SELECT id, homework_id, file_path, file_name, file_type, file_size
+         FROM homework_attachments WHERE homework_id = ?`,
+        [id]
+      );
+      attachments = atts;
+    } catch (e) {}
 
     hw.attachments = attachments.map(att => ({
       ...att,

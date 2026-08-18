@@ -1,4 +1,4 @@
-// Build trigger: force Render deployment v2.0
+// Build trigger: force Render deployment v3.0-perf-optimizations
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -82,7 +82,7 @@ app.get('/api/health', async (req, res) => {
   return res.json({
     status: 'online',
     system: 'Government Primary School Jainarkodi REST API',
-    deploy_ver: 'v2.5.0-pg-strict',
+    deploy_ver: 'v3.0-perf-optimizations',
     timezone: process.env.TIMEZONE || 'Asia/Kolkata',
     database: dbConnected ? 'connected' : 'disconnected',
     db_driver: driver,

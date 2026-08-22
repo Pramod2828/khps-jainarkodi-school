@@ -22,6 +22,8 @@ export interface TeacherProfile {
   qualification?: string;
   class_id?: number;
   teaching_standard?: string;
+  designation?: string;
+  role?: string;
   photo_url?: string;
 }
 

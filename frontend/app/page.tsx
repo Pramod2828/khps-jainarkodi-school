@@ -624,8 +624,14 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  <div className="space-y-1 w-full">
+                  <div className="space-y-1 w-full flex flex-col items-center">
                     <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-700 transition">{t.name}</h3>
+
+                    { (t.role === 'SUPER_ADMIN' || t.designation === 'Principal') ? (
+                      <p className="text-xs text-emerald-900 font-extrabold inline-flex items-center gap-1 justify-center bg-emerald-100 border border-emerald-300 px-3 py-0.5 rounded-full my-0.5">
+                        <Award className="w-3.5 h-3.5 text-emerald-700" /> Principal
+                      </p>
+                    ) : null }
 
                     {t.qualification && (
                       <p className="text-xs text-amber-800 font-semibold inline-flex items-center gap-1 justify-center bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
@@ -633,7 +639,7 @@ export default function HomePage() {
                       </p>
                     )}
 
-                    {t.teaching_standard && (
+                    { (t.role !== 'SUPER_ADMIN' && t.designation !== 'Principal' && t.teaching_standard) && (
                       <p className="text-xs text-emerald-800 font-extrabold flex items-center gap-1 justify-center pt-1">
                         <School className="w-3.5 h-3.5 text-emerald-600" /> {t.teaching_standard}
                       </p>
@@ -832,8 +838,12 @@ export default function HomePage() {
 
             {/* Teacher Name */}
             <div className="space-y-1">
-              <span className="text-[11px] font-extrabold text-emerald-700 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                Faculty Profile
+              <span className={`text-[11px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full border ${
+                selectedTeacherModal.role === 'SUPER_ADMIN' || selectedTeacherModal.designation === 'Principal'
+                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {selectedTeacherModal.role === 'SUPER_ADMIN' || selectedTeacherModal.designation === 'Principal' ? 'Principal Profile' : 'Faculty Profile'}
               </span>
               <h3 className="text-xl font-black text-slate-900 pt-1">
                 {selectedTeacherModal.name}
@@ -854,17 +864,31 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 border-t border-slate-200/60 pt-3">
-                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 shrink-0 mt-0.5">
-                  <School className="w-4 h-4" />
+              {(selectedTeacherModal.role === 'SUPER_ADMIN' || selectedTeacherModal.designation === 'Principal') ? (
+                <div className="flex items-start gap-3 border-t border-slate-200/60 pt-3">
+                  <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 shrink-0 mt-0.5">
+                    <Award className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium block text-[11px]">Designation</span>
+                    <span className="font-extrabold text-emerald-900 text-sm">
+                      Principal
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-500 font-medium block text-[11px]">Teaching Class / Standard</span>
-                  <span className="font-extrabold text-emerald-900 text-sm">
-                    {selectedTeacherModal.teaching_standard || 'Not Assigned'}
-                  </span>
+              ) : (
+                <div className="flex items-start gap-3 border-t border-slate-200/60 pt-3">
+                  <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 shrink-0 mt-0.5">
+                    <School className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium block text-[11px]">Teaching Class / Standard</span>
+                    <span className="font-extrabold text-emerald-900 text-sm">
+                      {selectedTeacherModal.teaching_standard || 'Not Assigned'}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-start gap-3 border-t border-slate-200/60 pt-3">
                 <div className="p-2 rounded-xl bg-blue-100 text-blue-800 shrink-0 mt-0.5">

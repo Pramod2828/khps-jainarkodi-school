@@ -48,12 +48,12 @@ async function getTeachers(req, res) {
 async function getPublicTeachers(req, res) {
   try {
     const [rows] = await pool.query(`
-      SELECT u.id, u.name, u.email, u.phone, u.qualification, u.class_id, c.class_name as teaching_standard, u.photo_url
+      SELECT u.id, u.name, u.email, u.phone, u.qualification, u.class_id, c.class_name as teaching_standard, u.photo_url, r.role_name
       FROM users u
       JOIN roles r ON u.role_id = r.id
       LEFT JOIN classes c ON u.class_id = c.id
-      WHERE u.status = 'ACTIVE' AND r.role_name = 'TEACHER'
-      ORDER BY COALESCE(c.display_order, 99) ASC, u.name ASC
+      WHERE u.status = 'ACTIVE' AND r.role_name IN ('SUPER_ADMIN', 'TEACHER')
+      ORDER BY CASE WHEN r.role_name = 'SUPER_ADMIN' THEN 0 ELSE 1 END ASC, COALESCE(c.display_order, 99) ASC, u.name ASC
     `);
 
     const processedRows = rows.map(u => ({
@@ -63,7 +63,9 @@ async function getPublicTeachers(req, res) {
       phone: u.phone || null,
       qualification: u.qualification || null,
       class_id: u.class_id || null,
-      teaching_standard: u.teaching_standard || null,
+      teaching_standard: u.role_name === 'SUPER_ADMIN' ? null : (u.teaching_standard || null),
+      designation: u.role_name === 'SUPER_ADMIN' ? 'Principal' : 'Teacher',
+      role: u.role_name,
       photo_url: sanitizeUrl(u.photo_url, 'teachers', u.id)
     }));
 

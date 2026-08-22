@@ -52,6 +52,24 @@ export default function HomePage() {
   // Homework & Teacher Pop-up Modal State
   const [selectedHwModal, setSelectedHwModal] = useState<Homework | null>(null);
   const [selectedTeacherModal, setSelectedTeacherModal] = useState<TeacherProfile | null>(null);
+  const [fullImagePreviewUrl, setFullImagePreviewUrl] = useState<string | null>(null);
+
+  // Close modals on Escape key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (fullImagePreviewUrl) {
+          setFullImagePreviewUrl(null);
+        } else if (selectedTeacherModal) {
+          setSelectedTeacherModal(null);
+        } else if (selectedHwModal) {
+          setSelectedHwModal(null);
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fullImagePreviewUrl, selectedTeacherModal, selectedHwModal]);
 
   useEffect(() => {
     async function loadHomeData() {
@@ -782,16 +800,31 @@ export default function HomePage() {
             </button>
 
             {/* Teacher Photo */}
-            <div className="w-28 h-28 mx-auto rounded-full overflow-hidden bg-slate-100 border-4 border-emerald-500/30 shadow-md flex items-center justify-center shrink-0">
+            <div
+              onClick={() => {
+                if (selectedTeacherModal.photo_url) {
+                  setFullImagePreviewUrl(getAssetUrl(selectedTeacherModal.photo_url));
+                }
+              }}
+              className={`relative w-28 h-28 mx-auto rounded-full overflow-hidden bg-slate-100 border-4 border-emerald-500/30 shadow-md flex items-center justify-center shrink-0 group ${
+                selectedTeacherModal.photo_url ? 'cursor-pointer hover:border-emerald-500 hover:scale-105 transition duration-200' : ''
+              }`}
+              title={selectedTeacherModal.photo_url ? "Click to view full image" : ""}
+            >
               {selectedTeacherModal.photo_url ? (
-                <img
-                  src={getAssetUrl(selectedTeacherModal.photo_url)}
-                  alt={selectedTeacherModal.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
+                <>
+                  <img
+                    src={getAssetUrl(selectedTeacherModal.photo_url)}
+                    alt={selectedTeacherModal.name}
+                    className="w-full h-full object-cover group-hover:opacity-90 transition"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
+                    <Maximize2 className="w-5 h-5 drop-shadow-md" />
+                  </div>
+                </>
               ) : (
                 <UserCheck className="w-12 h-12 text-slate-400" />
               )}
@@ -865,6 +898,37 @@ export default function HomePage() {
               >
                 Close Profile
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Teacher Image Preview Modal */}
+      {fullImagePreviewUrl && (
+        <div
+          onClick={() => setFullImagePreviewUrl(null)}
+          className="fixed inset-0 z-[60] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 animate-in fade-in duration-200 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center p-2 sm:p-4 bg-slate-900/40 rounded-3xl border border-white/10 shadow-2xl cursor-default"
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setFullImagePreviewUrl(null)}
+              className="absolute -top-3 -right-3 sm:top-4 sm:right-4 z-10 bg-slate-900/90 hover:bg-rose-600 text-white p-2.5 rounded-full shadow-lg border border-white/20 transition cursor-pointer"
+              title="Close Full Image (ESC)"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Full Image */}
+            <div className="w-full h-full flex items-center justify-center overflow-hidden rounded-2xl">
+              <img
+                src={fullImagePreviewUrl}
+                alt="Full Teacher Photo"
+                className="max-h-[85vh] max-w-[90vw] w-auto h-auto object-contain rounded-2xl shadow-2xl transition duration-300"
+              />
             </div>
           </div>
         </div>

@@ -258,7 +258,7 @@ const pool = {
 async function getSqliteDb() {
   if (!sqliteDb) {
     try {
-      const { initSqliteDb } = require('./sqliteDb');
+      const { getSqliteDb: initSqliteDb } = require('./sqliteDb');
       sqliteDb = await initSqliteDb();
     } catch (err) {
       console.error('⚠️ SQLite loading error:', err.message);

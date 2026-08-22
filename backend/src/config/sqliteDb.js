@@ -69,6 +69,9 @@ async function initSqliteSchema(db) {
       must_change_password INTEGER DEFAULT 1,
       last_login_at TEXT,
       plain_password TEXT DEFAULT 'Jainarkodi#2026!',
+      qualification TEXT,
+      class_id INTEGER,
+      photo_url TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
@@ -76,6 +79,15 @@ async function initSqliteSchema(db) {
 
   try {
     await db.exec("ALTER TABLE users ADD COLUMN plain_password TEXT DEFAULT 'Jainarkodi#2026!';");
+  } catch (e) {}
+  try {
+    await db.exec("ALTER TABLE users ADD COLUMN qualification TEXT;");
+  } catch (e) {}
+  try {
+    await db.exec("ALTER TABLE users ADD COLUMN class_id INTEGER;");
+  } catch (e) {}
+  try {
+    await db.exec("ALTER TABLE users ADD COLUMN photo_url TEXT;");
   } catch (e) {}
 
   // 2.1 Password Resets

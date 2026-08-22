@@ -315,6 +315,9 @@ async function migratePostgres(pool) {
       // users
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password VARCHAR(255)`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS qualification VARCHAR(255)`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS class_id INT`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT`,
 
       // gallery
       `ALTER TABLE gallery ADD COLUMN IF NOT EXISTS description TEXT`,

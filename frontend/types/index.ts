@@ -3,11 +3,24 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
+  qualification?: string;
+  class_id?: number;
+  teaching_standard?: string;
+  photo_url?: string;
   role: 'SUPER_ADMIN' | 'TEACHER';
   status: 'ACTIVE' | 'INACTIVE';
   must_change_password?: boolean;
   last_login_at?: string;
   created_at?: string;
+}
+
+export interface TeacherProfile {
+  id: number;
+  name: string;
+  qualification?: string;
+  class_id?: number;
+  teaching_standard?: string;
+  photo_url?: string;
 }
 
 export interface HomeworkAttachment {

@@ -7,7 +7,7 @@ import Footer from '@/components/Footer';
 import AnnouncementTicker from '@/components/AnnouncementTicker';
 import LoadingState from '@/components/LoadingState';
 import { api, getAssetUrl, openFileUrl } from '@/services/api';
-import { Homework, Notice, Activity, CalendarEvent, SchoolInfo, ClassItem, Announcement, GalleryItem } from '@/types';
+import { Homework, Notice, Activity, CalendarEvent, SchoolInfo, ClassItem, Announcement, GalleryItem, TeacherProfile } from '@/types';
 import {
   BookOpen,
   Bell,
@@ -29,7 +29,9 @@ import {
   CheckCircle2,
   UserCheck,
   Maximize2,
-  Megaphone
+  Megaphone,
+  GraduationCap,
+  School
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -42,6 +44,7 @@ export default function HomePage() {
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [galleryPhotos, setGalleryPhotos] = useState<GalleryItem[]>([]);
+  const [teachersList, setTeachersList] = useState<TeacherProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [hwLoading, setHwLoading] = useState(false);
 
@@ -51,7 +54,7 @@ export default function HomePage() {
   useEffect(() => {
     async function loadHomeData() {
       try {
-        const [infoRes, cRes, noticeRes, actRes, calRes, annRes, hwRes, galRes] = await Promise.all([
+        const [infoRes, cRes, noticeRes, actRes, calRes, annRes, hwRes, galRes, teacherRes] = await Promise.all([
           api.get('/school'),
           api.get('/classes'),
           api.get('/notices?limit=4'),
@@ -59,7 +62,8 @@ export default function HomePage() {
           api.get('/calendar?upcoming=true&limit=4'),
           api.get('/announcements'),
           api.get('/homework?limit=6&class_id=all'),
-          api.get('/gallery?limit=6')
+          api.get('/gallery?limit=6'),
+          api.get('/teachers/public')
         ]);
 
         if (infoRes.data.success) setSchoolInfo(infoRes.data.data);
@@ -69,6 +73,7 @@ export default function HomePage() {
         if (annRes.data.success) setAnnouncements(annRes.data.data || []);
         if (hwRes.data.success) setLatestHomework(hwRes.data.data || []);
         if (galRes && galRes.data && galRes.data.success) setGalleryPhotos(galRes.data.data || []);
+        if (teacherRes && teacherRes.data && teacherRes.data.success) setTeachersList(teacherRes.data.data || []);
         if (calRes.data.success) {
           const now = new Date();
           const year = now.getFullYear();
@@ -565,6 +570,55 @@ export default function HomePage() {
             </div>
           )}
         </section>
+
+        {/* Our Teachers Showcase Section */}
+        {teachersList && teachersList.length > 0 && (
+          <section className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 border-b border-slate-200 pb-4">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Faculty & Mentors</span>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Our Dedicated Teachers</h2>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {teachersList.map((t) => (
+                <div key={t.id} className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition text-center space-y-3 flex flex-col items-center">
+                  <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 border-2 border-emerald-500/30 shadow-xs shrink-0 flex items-center justify-center">
+                    {t.photo_url ? (
+                      <img
+                        src={getAssetUrl(t.photo_url)}
+                        alt={t.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <UserCheck className="w-10 h-10 text-slate-400" />
+                    )}
+                  </div>
+
+                  <div className="space-y-1 w-full">
+                    <h3 className="text-base font-bold text-slate-900">{t.name}</h3>
+
+                    {t.qualification && (
+                      <p className="text-xs text-amber-800 font-semibold inline-flex items-center gap-1 justify-center bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                        <GraduationCap className="w-3 h-3 text-amber-600" /> {t.qualification}
+                      </p>
+                    )}
+
+                    {t.teaching_standard && (
+                      <p className="text-xs text-emerald-800 font-extrabold flex items-center gap-1 justify-center pt-1">
+                        <School className="w-3.5 h-3.5 text-emerald-600" /> {t.teaching_standard}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Photo Gallery Showcase Section */}
         <section className="space-y-6">

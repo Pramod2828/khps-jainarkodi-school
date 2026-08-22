@@ -31,7 +31,8 @@ import {
   Maximize2,
   Megaphone,
   GraduationCap,
-  School
+  School,
+  Mail
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -48,8 +49,9 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [hwLoading, setHwLoading] = useState(false);
 
-  // Homework Pop-up Modal State
+  // Homework & Teacher Pop-up Modal State
   const [selectedHwModal, setSelectedHwModal] = useState<Homework | null>(null);
+  const [selectedTeacherModal, setSelectedTeacherModal] = useState<TeacherProfile | null>(null);
 
   useEffect(() => {
     async function loadHomeData() {
@@ -583,8 +585,13 @@ export default function HomePage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {teachersList.map((t) => (
-                <div key={t.id} className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition text-center space-y-3 flex flex-col items-center">
-                  <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 border-2 border-emerald-500/30 shadow-xs shrink-0 flex items-center justify-center">
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedTeacherModal(t)}
+                  className="group bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-400 hover:scale-[1.02] active:scale-98 transition duration-200 text-center space-y-3 flex flex-col items-center cursor-pointer relative"
+                  title={`Click to view ${t.name}'s profile`}
+                >
+                  <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 border-2 border-emerald-500/30 shadow-xs shrink-0 flex items-center justify-center group-hover:border-emerald-500 transition">
                     {t.photo_url ? (
                       <img
                         src={getAssetUrl(t.photo_url)}
@@ -600,7 +607,7 @@ export default function HomePage() {
                   </div>
 
                   <div className="space-y-1 w-full">
-                    <h3 className="text-base font-bold text-slate-900">{t.name}</h3>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-700 transition">{t.name}</h3>
 
                     {t.qualification && (
                       <p className="text-xs text-amber-800 font-semibold inline-flex items-center gap-1 justify-center bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
@@ -613,6 +620,10 @@ export default function HomePage() {
                         <School className="w-3.5 h-3.5 text-emerald-600" /> {t.teaching_standard}
                       </p>
                     )}
+
+                    <p className="text-[11px] font-bold text-emerald-700 pt-1 group-hover:underline flex items-center justify-center gap-1 opacity-90">
+                      View Profile <ChevronRight className="w-3.5 h-3.5" />
+                    </p>
                   </div>
                 </div>
               ))}
@@ -752,6 +763,107 @@ export default function HomePage() {
                 className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-6 py-2.5 rounded-xl transition"
               >
                 Close Homework Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher Profile Pop-up Modal */}
+      {selectedTeacherModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative space-y-6 border border-slate-100 text-center animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setSelectedTeacherModal(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition"
+              title="Close Profile"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Teacher Photo */}
+            <div className="w-28 h-28 mx-auto rounded-full overflow-hidden bg-slate-100 border-4 border-emerald-500/30 shadow-md flex items-center justify-center shrink-0">
+              {selectedTeacherModal.photo_url ? (
+                <img
+                  src={getAssetUrl(selectedTeacherModal.photo_url)}
+                  alt={selectedTeacherModal.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <UserCheck className="w-12 h-12 text-slate-400" />
+              )}
+            </div>
+
+            {/* Teacher Name */}
+            <div className="space-y-1">
+              <span className="text-[11px] font-extrabold text-emerald-700 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                Faculty Profile
+              </span>
+              <h3 className="text-xl font-black text-slate-900 pt-1">
+                {selectedTeacherModal.name}
+              </h3>
+            </div>
+
+            {/* Detailed Attributes */}
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4 text-left text-xs">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-800 shrink-0 mt-0.5">
+                  <GraduationCap className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block text-[11px]">Education / Qualification</span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    {selectedTeacherModal.qualification || 'Not Specified'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 border-t border-slate-200/60 pt-3">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800 shrink-0 mt-0.5">
+                  <School className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block text-[11px]">Teaching Class / Standard</span>
+                  <span className="font-extrabold text-emerald-900 text-sm">
+                    {selectedTeacherModal.teaching_standard || 'Not Assigned'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 border-t border-slate-200/60 pt-3">
+                <div className="p-2 rounded-xl bg-blue-100 text-blue-800 shrink-0 mt-0.5">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block text-[11px]">Mobile Number</span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    {selectedTeacherModal.phone || 'Not Provided'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 border-t border-slate-200/60 pt-3">
+                <div className="p-2 rounded-xl bg-purple-100 text-purple-800 shrink-0 mt-0.5">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block text-[11px]">Email Address</span>
+                  <span className="font-extrabold text-slate-900 text-sm break-all">
+                    {selectedTeacherModal.email || 'Not Provided'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-center">
+              <button
+                onClick={() => setSelectedTeacherModal(null)}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-8 py-3 rounded-xl transition shadow-sm"
+              >
+                Close Profile
               </button>
             </div>
           </div>

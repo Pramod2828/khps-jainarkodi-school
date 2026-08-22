@@ -17,6 +17,8 @@ export interface User {
 export interface TeacherProfile {
   id: number;
   name: string;
+  email?: string;
+  phone?: string;
   qualification?: string;
   class_id?: number;
   teaching_standard?: string;

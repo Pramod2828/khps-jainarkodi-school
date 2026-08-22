@@ -48,7 +48,7 @@ async function getTeachers(req, res) {
 async function getPublicTeachers(req, res) {
   try {
     const [rows] = await pool.query(`
-      SELECT u.id, u.name, u.phone, u.qualification, u.class_id, c.class_name as teaching_standard, u.photo_url
+      SELECT u.id, u.name, u.email, u.phone, u.qualification, u.class_id, c.class_name as teaching_standard, u.photo_url
       FROM users u
       JOIN roles r ON u.role_id = r.id
       LEFT JOIN classes c ON u.class_id = c.id
@@ -59,6 +59,8 @@ async function getPublicTeachers(req, res) {
     const processedRows = rows.map(u => ({
       id: u.id,
       name: u.name,
+      email: u.email || null,
+      phone: u.phone || null,
       qualification: u.qualification || null,
       class_id: u.class_id || null,
       teaching_standard: u.teaching_standard || null,
